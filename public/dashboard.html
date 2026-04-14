@@ -43,7 +43,7 @@
 
       <!-- OTP section -->
       <div class="security-section">
-        <h3>TOTP / Authenticator App</h3>
+        <h3>OTP / Authenticator App</h3>
         <div id="otpStatus">Loading...</div>
         <div id="otpSetup" style="display:none">
           <p class="hint">Scan this secret in your authenticator app (e.g. Google Authenticator), then click Enable.</p>
@@ -117,6 +117,7 @@
       } else {
         document.getElementById('otpStatus').style.display = 'none';
         document.getElementById('otpSetup').style.display = 'block';
+        setupOtp();
       }
 
       // Passkey section
@@ -170,9 +171,10 @@
       loadSessions();
     }
 
-    // OTP setup
+    // OTP setup — only called when OTP is not yet enabled
     async function setupOtp() {
       const res = await api('/api/auth/otp/setup', { method: 'POST' });
+      if (!res.ok) return; // user already has OTP set up, skip
       const data = await res.json();
       document.getElementById('otpSecret').textContent = data.secret;
       document.getElementById('otpUri').textContent = data.otpauthUri;
@@ -239,7 +241,6 @@
     // Init
     loadMe();
     loadSessions();
-    setupOtp();
   </script>
 </body>
 </html>

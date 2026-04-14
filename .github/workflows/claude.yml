@@ -38,5 +38,6 @@ jobs:
           anthropic_api_key: ${{ secrets.ANTHROPIC_AUTH_TOKEN }}
 
           # Set both API key and base URL for Claude Code runtime
-          env: |
+          claude_env: |
+            ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_AUTH_TOKEN }}
             ANTHROPIC_BASE_URL: ${{ secrets.ANTHROPIC_BASE_URL }}

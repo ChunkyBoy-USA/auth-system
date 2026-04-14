@@ -219,6 +219,10 @@
       try {
         const optsRes = await api('/api/auth/passkey/register-options', { method: 'POST' });
         const opts = await optsRes.json();
+        // Debug: log what we're passing to startRegistration
+        console.log('[passkey] optionsJSON.challenge:', typeof opts.challenge, opts.challenge);
+        console.log('[passkey] optionsJSON.user:', opts.user);
+        if (!optsRes.ok) { showMsg('Server error: ' + opts.error, 'error'); return; }
         const credential = await SimpleWebAuthnBrowser.startRegistration({ optionsJSON: opts });
         const verifyRes = await api('/api/auth/passkey/register-verify', {
           method: 'POST',
@@ -228,7 +232,9 @@
         if (data.success) { showMsg('Passkey registered!', 'success'); loadMe(); }
         else showMsg(data.error, 'error');
       } catch (err) {
-        showMsg('Passkey error: ' + err.message, 'error');
+        // Include stack trace for debugging
+        console.error('[passkey] full error:', err);
+        showMsg('Passkey error: ' + err.message + ' | ' + (err.stack || '').split('\n')[1], 'error');
       }
     }
 

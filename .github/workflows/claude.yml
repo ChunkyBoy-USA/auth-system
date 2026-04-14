@@ -34,9 +34,10 @@ jobs:
         id: claude
         uses: anthropics/claude-code-action@v1
         with:
-          # API key for authentication (satisfies action validation)
+          # API key for action validation
           anthropic_api_key: ${{ secrets.ANTHROPIC_AUTH_TOKEN }}
 
-          # Custom base URL to route requests to third-party provider
+          # Set both API key and base URL for Claude Code runtime
           claude_env: |
+            ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_AUTH_TOKEN }}
             ANTHROPIC_BASE_URL: ${{ secrets.ANTHROPIC_BASE_URL }}

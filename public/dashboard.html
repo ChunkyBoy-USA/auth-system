@@ -46,11 +46,10 @@
         <h3>OTP / Authenticator App</h3>
         <div id="otpStatus">Loading...</div>
         <div id="otpSetup" style="display:none">
-          <p class="hint">Scan this secret in your authenticator app (e.g. Google Authenticator), then click Enable.</p>
-          <p class="hint"><strong>Secret:</strong> <code id="otpSecret"></code></p>
-          <p class="hint"><strong>URI:</strong> <code id="otpUri"></code></p>
+          <p class="hint">Scan the QR code below with Google Authenticator (or any TOTP app), then enter the code to enable.</p>
+          <img id="otpQrCode" src="" alt="OTP QR Code" style="display:block;margin:12px auto;max-width:200px;border-radius:8px;" />
           <div class="form-group">
-            <label for="otpEnableCode">Confirm with a code:</label>
+            <label for="otpEnableCode">Enter code from app:</label>
             <input type="text" id="otpEnableCode" placeholder="6-digit code" maxlength="6" />
           </div>
           <button class="btn primary" onclick="enableOtp()">Enable OTP</button>
@@ -174,10 +173,11 @@
     // OTP setup — only called when OTP is not yet enabled
     async function setupOtp() {
       const res = await api('/api/auth/otp/setup', { method: 'POST' });
-      if (!res.ok) return; // user already has OTP set up, skip
+      if (!res.ok) return; // user already has OTP set up
       const data = await res.json();
-      document.getElementById('otpSecret').textContent = data.secret;
-      document.getElementById('otpUri').textContent = data.otpauthUri;
+      const qrImg = document.getElementById('otpQrCode');
+      qrImg.src = data.qrCodeDataUrl;
+      qrImg.style.display = 'block';
     }
 
     async function enableOtp() {

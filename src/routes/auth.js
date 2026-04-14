@@ -1,6 +1,7 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const speakeasy = require('speakeasy');
+const QRCode = require('qrcode');
 const { v4: uuidv4 } = require('uuid');
 const {
   findUserByUsername,
@@ -277,7 +278,7 @@ router.delete('/sessions/:id', authMiddleware, (req, res) => {
 });
 
 // ─── POST /api/auth/otp/setup ────────────────────────────────────
-router.post('/otp/setup', authMiddleware, (req, res) => {
+router.post('/otp/setup', authMiddleware, async (req, res) => {
   if (req.user.otp_secret) {
     return res.status(400).json({ error: 'OTP already set up' });
   }
@@ -285,10 +286,12 @@ router.post('/otp/setup', authMiddleware, (req, res) => {
   const secret = speakeasy.generateSecret({ name: req.user.username, issuer: 'AuthSystem', length: 20 });
   updateUserOtp(req.user.id, secret.base32);
 
+  const qrCodeDataUrl = await QRCode.toDataURL(secret.otpauth_url);
 
   res.json({
     secret: secret.base32,
     otpauthUri: secret.otpauth_url,
+    qrCodeDataUrl,
     message: 'Scan this secret in your authenticator app. Then enable with /api/auth/otp/enable',
   });
 });

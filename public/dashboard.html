@@ -224,11 +224,19 @@
     async function registerPasskey() {
       try {
         const optsRes = await api('/api/auth/passkey/register-options', { method: 'POST' });
-        const opts = await optsRes.json();
-        // Debug: log what we're passing to startRegistration
-        console.log('[passkey] optionsJSON.challenge:', typeof opts.challenge, opts.challenge);
-        console.log('[passkey] optionsJSON.user:', opts.user);
-        if (!optsRes.ok) { showMsg('Server error: ' + opts.error, 'error'); return; }
+        const rawText = await optsRes.text();
+        console.log('[passkey] raw response status:', optsRes.status, 'body:', rawText.substring(0, 200));
+        if (!optsRes.ok) {
+          showMsg('Server error ' + optsRes.status, 'error');
+          return;
+        }
+        const opts = JSON.parse(rawText);
+        // Defensive validation
+        if (!opts.challenge || !opts.user || !opts.user.id) {
+          showMsg('Invalid options from server: ' + JSON.stringify(opts), 'error');
+          return;
+        }
+        console.log('[passkey] calling startRegistration with challenge:', typeof opts.challenge, opts.challenge, 'user.id:', typeof opts.user.id, opts.user.id);
         const credential = await SimpleWebAuthnBrowser.startRegistration({ optionsJSON: opts });
         const verifyRes = await api('/api/auth/passkey/register-verify', {
           method: 'POST',
@@ -238,9 +246,8 @@
         if (data.success) { showMsg('Passkey registered!', 'success'); loadMe(); }
         else showMsg(data.error, 'error');
       } catch (err) {
-        // Include stack trace for debugging
         console.error('[passkey] full error:', err);
-        showMsg('Passkey error: ' + err.message + ' | ' + (err.stack || '').split('\n')[1], 'error');
+        showMsg('Passkey error: ' + err.message, 'error');
       }
     }
 

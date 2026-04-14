@@ -37,6 +37,10 @@ jobs:
           # API key for action validation
           anthropic_api_key: ${{ secrets.ANTHROPIC_AUTH_TOKEN }}
 
+          # Explicitly set the model
+          claude_args: |
+            --model claude-sonnet-4-6
+
           # Configure environment variables via settings
           settings: |
             {

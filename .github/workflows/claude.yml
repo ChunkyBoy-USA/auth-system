@@ -34,9 +34,7 @@ jobs:
         id: claude
         uses: anthropics/claude-code-action@v1
         with:
-          # Use your third-party provider's auth token
-          anthropic_api_key: ${{ secrets.ANTHROPIC_AUTH_TOKEN }}
-
-          # Pass the custom base URL so Claude Code hits your proxy
+          # Pass both API key and base URL as environment variables
           claude_env: |
+            ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_AUTH_TOKEN }}
             ANTHROPIC_BASE_URL: ${{ secrets.ANTHROPIC_BASE_URL }}

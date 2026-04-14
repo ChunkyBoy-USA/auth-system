@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>AuthSystem — Dashboard</title>
   <link rel="stylesheet" href="/style.css" />
+  <script src="/lib/simplewebauthn-browser.umd.min.js"></script>
 </head>
 <body>
   <nav class="navbar">
@@ -218,8 +219,7 @@
       try {
         const optsRes = await api('/api/auth/passkey/register-options', { method: 'POST' });
         const opts = await optsRes.json();
-        const { startRegistration } = SimpleWebAuthnBrowser;
-        const credential = await startRegistration({ optionsJSON: opts });
+        const credential = await SimpleWebAuthnBrowser.startRegistration({ optionsJSON: opts });
         const verifyRes = await api('/api/auth/passkey/register-verify', {
           method: 'POST',
           body: JSON.stringify(credential),

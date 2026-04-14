@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>AuthSystem — Login</title>
   <link rel="stylesheet" href="/style.css" />
+  <script src="/lib/simplewebauthn-browser.umd.min.js"></script>
 </head>
 <body>
   <div class="container">
@@ -124,8 +125,7 @@
         const opts = await optsRes.json();
 
         // Step 2: get assertion from browser
-        const { startAuthentication } = SimpleWebAuthnBrowser;
-        const assertion = await startAuthentication({ optionsJSON: opts });
+        const assertion = await SimpleWebAuthnBrowser.startAuthentication({ optionsJSON: opts });
 
         // Step 3: verify on server
         const verifyRes = await fetch('/api/auth/passkey/login-verify', {

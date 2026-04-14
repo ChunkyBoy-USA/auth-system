@@ -262,6 +262,20 @@ router.get('/sessions', authMiddleware, (req, res) => {
   );
 });
 
+// ─── DELETE /api/auth/sessions/:id ─────────────────────────────
+router.delete('/sessions/:id', authMiddleware, (req, res) => {
+  const { id } = req.params;
+  const session = findSessionById(id);
+  if (!session || session.user_id !== req.user.id) {
+    return res.status(404).json({ error: 'Session not found' });
+  }
+  if (session.id === req.session.id) {
+    return res.status(400).json({ error: 'Cannot revoke current session — use /logout instead' });
+  }
+  deleteSession(id);
+  res.json({ success: true });
+});
+
 // ─── POST /api/auth/otp/setup ────────────────────────────────────
 router.post('/otp/setup', authMiddleware, (req, res) => {
   if (req.user.otp_secret) {

@@ -1,10 +1,10 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const speakeasy = require('speakeasy');
-const { authenticator } = speakeasy;
 const { v4: uuidv4 } = require('uuid');
 const {
   findUserByUsername,
+  findUserById,
   createUser,
   createSession,
   deleteSession,
@@ -128,7 +128,7 @@ router.post('/login/otp', (req, res) => {
     return res.status(401).json({ error: 'Invalid credentials or OTP not set up' });
   }
 
-  const verified = authenticator.verify({ token: otp_code, secret: user.otp_secret });
+  const verified = speakeasy.totp.verify({ secret: user.otp_secret, encoding: 'base32', token: otp_code });
   if (!verified) {
     return res.status(401).json({ error: 'Invalid OTP code' });
   }
@@ -200,7 +200,7 @@ router.post('/mfa/verify', (req, res) => {
     return res.status(401).json({ error: 'User not found or OTP not set up' });
   }
 
-  const verified = authenticator.verify({ token: otp_code, secret: user.otp_secret });
+  const verified = speakeasy.totp.verify({ secret: user.otp_secret, encoding: 'base32', token: otp_code });
   if (!verified) {
     return res.status(401).json({ error: 'Invalid OTP code' });
   }
@@ -282,18 +282,13 @@ router.post('/otp/setup', authMiddleware, (req, res) => {
     return res.status(400).json({ error: 'OTP already set up' });
   }
 
-  const secret = authenticator.generateSecret();
-  updateUserOtp(req.user.id, secret);
+  const secret = speakeasy.generateSecret({ name: req.user.username, issuer: 'AuthSystem', length: 20 });
+  updateUserOtp(req.user.id, secret.base32);
 
-  const otpauthUri = authenticator.keyuri(
-    req.user.username,
-    'AuthSystem',
-    secret
-  );
 
   res.json({
-    secret,
-    otpauthUri,
+    secret: secret.base32,
+    otpauthUri: secret.otpauth_url,
     message: 'Scan this secret in your authenticator app. Then enable with /api/auth/otp/enable',
   });
 });
@@ -310,7 +305,7 @@ router.post('/otp/enable', authMiddleware, (req, res) => {
     return res.status(400).json({ error: 'OTP not set up. Call /otp/setup first.' });
   }
 
-  const verified = authenticator.verify({ token: otp_code, secret: req.user.otp_secret });
+  const verified = speakeasy.totp.verify({ secret: req.user.otp_secret, encoding: 'base32', token: otp_code });
   if (!verified) {
     return res.status(401).json({ error: 'Invalid OTP code — setup not confirmed' });
   }
@@ -330,7 +325,7 @@ router.post('/otp/disable', authMiddleware, (req, res) => {
     return res.status(400).json({ error: 'OTP not enabled' });
   }
 
-  const verified = authenticator.verify({ token: otp_code, secret: req.user.otp_secret });
+  const verified = speakeasy.totp.verify({ secret: req.user.otp_secret, encoding: 'base32', token: otp_code });
   if (!verified) {
     return res.status(401).json({ error: 'Invalid OTP code' });
   }

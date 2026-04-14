@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AuthSystem — Register</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <nav class="navbar">
+    <div class="nav-brand">🔐 AuthSystem</div>
+    <a href="/" class="btn outline" style="text-decoration:none">Sign In</a>
+  </nav>
+
+  <div class="container">
+    <div class="card">
+      <div class="logo">🔐 AuthSystem</div>
+      <h1>Create Account</h1>
+
+      <form id="registerForm">
+        <div class="form-group">
+          <label for="username">Username</label>
+          <input type="text" id="username" name="username" placeholder="Choose a username" required minlength="3" />
+        </div>
+
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input type="password" id="password" name="password" placeholder="Choose a password" required minlength="6" />
+        </div>
+
+        <div class="form-group">
+          <label>Account Type</label>
+          <div class="tabs">
+            <button type="button" class="tab active" data-type="member">Member</button>
+            <button type="button" class="tab" data-type="community_staff">Community Staff</button>
+            <button type="button" class="tab" data-type="platform_staff">Platform Staff</button>
+          </div>
+          <input type="hidden" id="subjectId" value="1" />
+        </div>
+
+        <button type="submit" class="btn primary" id="submitBtn">Create Account</button>
+      </form>
+
+      <p class="hint" id="message"></p>
+    </div>
+  </div>
+
+  <script>
+    let selectedSubjectType = 'member';
+    const subjectTypeMap = { member: 1, community_staff: 2, platform_staff: 3 };
+
+    document.querySelectorAll('.tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        selectedSubjectType = btn.dataset.type;
+        document.getElementById('subjectId').value = subjectTypeMap[selectedSubjectType];
+      });
+    });
+
+    document.getElementById('registerForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value;
+      const subjectId = parseInt(document.getElementById('subjectId').value);
+      const submitBtn = document.getElementById('submitBtn');
+      const messageEl = document.getElementById('message');
+
+      messageEl.textContent = '';
+      submitBtn.disabled = true;
+
+      try {
+        const res = await fetch('/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password, subjectId }),
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          messageEl.textContent = 'Account created! Redirecting to login...';
+          messageEl.className = 'success';
+          setTimeout(() => window.location.href = '/', 1500);
+        } else {
+          messageEl.textContent = data.error || 'Registration failed';
+          messageEl.className = 'error';
+        }
+      } catch (err) {
+        messageEl.textContent = 'Network error: ' + err.message;
+        messageEl.className = 'error';
+      }
+
+      submitBtn.disabled = false;
+    });
+  </script>
+</body>
+</html>

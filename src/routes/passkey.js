@@ -28,7 +28,15 @@ router.post('/register-options', authMiddleware, async (req, res) => {
     timeout: 60000,
   }));
 
-  // Store challenge for verification
+  // Convert user.id from Uint8Array to base64url string so it serialises
+  // correctly in JSON (Uint8Array serialises as { "0": 49 } which
+  // startRegistration cannot decode)
+  options.user = {
+    ...options.user,
+    id: isoBase64URL.fromBuffer(options.user.id),
+  };
+
+  // Store challenge in base64url form for consistent comparison at verify time
   challengeStore.set(user.id, {
     challenge: options.challenge,
     expiresAt: Date.now() + 5 * 60 * 1000,

@@ -2,36 +2,45 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 
-// Initialize DB (creates tables if not exist)
-require('./src/db/database');
+const { initDb } = require('./src/db/database');
 
 const authRouter = require('./src/routes/auth');
 const passkeyRouter = require('./src/routes/passkey');
 
-const app = express();
-const PORT = process.env.PORT || 3000;
+async function start() {
+  // Initialize DB (creates tables if not exist)
+  await initDb();
 
-// Middleware
-app.use(cors());
-app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
+  const app = express();
+  const PORT = process.env.PORT || 3000;
 
-// API routes
-app.use('/api/auth', authRouter);
-app.use('/api/auth/passkey', passkeyRouter);
+  // Middleware
+  app.use(cors());
+  app.use(express.json());
+  app.use(express.static(path.join(__dirname, 'public')));
 
-// Serve index.html for root
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
+  // API routes
+  app.use('/api/auth', authRouter);
+  app.use('/api/auth/passkey', passkeyRouter);
 
-// Catch-all: serve dashboard.html for /dashboard
-app.get('/dashboard', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
-});
+  // Serve index.html for root
+  app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  });
 
-app.listen(PORT, () => {
-  console.log(`AuthSystem running at http://localhost:${PORT}`);
-});
+  // Catch-all: serve dashboard.html for /dashboard
+  app.get('/dashboard', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
+  });
 
-module.exports = app;
+  app.listen(PORT, () => {
+    console.log(`AuthSystem running at http://localhost:${PORT}`);
+  });
+
+  return app;
+}
+
+start().catch(console.error);
+
+module.exports = { start };
+

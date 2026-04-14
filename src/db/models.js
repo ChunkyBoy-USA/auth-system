@@ -1,35 +1,33 @@
-const db = require('./database');
+const { prepare } = require('./database');
 
 // ─── Subject helpers ───────────────────────────────────────────
 function getSubjectById(id) {
-  return db.prepare('SELECT * FROM subjects WHERE id = ?').get(id);
+  return prepare('SELECT * FROM subjects WHERE id = ?').get(id);
 }
 
 // ─── User helpers ──────────────────────────────────────────────
 function findUserByUsername(username) {
-  return db.prepare('SELECT * FROM users WHERE username = ?').get(username);
+  return prepare('SELECT * FROM users WHERE username = ?').get(username);
 }
 
 function findUserById(id) {
-  return db.prepare('SELECT * FROM users WHERE id = ?').get(id);
+  return prepare('SELECT * FROM users WHERE id = ?').get(id);
 }
 
 function createUser({ username, passwordHash, subjectId }) {
-  const info = db
-    .prepare(
-      'INSERT INTO users (username, password_hash, subject_id) VALUES (?, ?, ?)'
-    )
-    .run(username, passwordHash, subjectId);
+  const info = prepare(
+    'INSERT INTO users (username, password_hash, subject_id) VALUES (?, ?, ?)'
+  ).run(username, passwordHash, subjectId);
   return findUserById(info.lastInsertRowid);
 }
 
 function updateUserOtp(userId, otpSecret) {
-  db.prepare('UPDATE users SET otp_secret = ? WHERE id = ?').run(otpSecret, userId);
+  prepare('UPDATE users SET otp_secret = ? WHERE id = ?').run(otpSecret, userId);
   return findUserById(userId);
 }
 
 function updateUserPasskey(userId, credentialId, publicKey) {
-  db.prepare(
+  prepare(
     'UPDATE users SET passkey_credential_id = ?, passkey_public_key = ? WHERE id = ?'
   ).run(credentialId, publicKey, userId);
   return findUserById(userId);
@@ -37,56 +35,51 @@ function updateUserPasskey(userId, credentialId, publicKey) {
 
 // ─── Session helpers ────────────────────────────────────────────
 function createSession({ id, userId, deviceName, ipAddress, expiresAt }) {
-  db.prepare(
-    `INSERT INTO sessions (id, user_id, device_name, ip_address, expires_at)
-     VALUES (?, ?, ?, ?, ?)`
+  prepare(
+    'INSERT INTO sessions (id, user_id, device_name, ip_address, expires_at) VALUES (?, ?, ?, ?, ?)'
   ).run(id, userId, deviceName, ipAddress, expiresAt);
   return findSessionById(id);
 }
 
 function findSessionById(id) {
-  return db.prepare('SELECT * FROM sessions WHERE id = ?').get(id);
+  return prepare('SELECT * FROM sessions WHERE id = ?').get(id);
 }
 
 function findSessionsByUserId(userId) {
-  return db
-    .prepare('SELECT * FROM sessions WHERE user_id = ? ORDER BY created_at DESC')
-    .all(userId);
+  return prepare('SELECT * FROM sessions WHERE user_id = ? ORDER BY created_at DESC').all(userId);
 }
 
 function touchSession(sessionId) {
-  db.prepare(
-    "UPDATE sessions SET last_active_at = strftime('%s', 'now') WHERE id = ?"
-  ).run(sessionId);
+  prepare("UPDATE sessions SET last_active_at = strftime('%s', 'now') WHERE id = ?").run(sessionId);
 }
 
 function deleteSession(sessionId) {
-  db.prepare('DELETE FROM sessions WHERE id = ?').run(sessionId);
+  prepare('DELETE FROM sessions WHERE id = ?').run(sessionId);
 }
 
 function deleteAllSessionsForUser(userId) {
-  db.prepare('DELETE FROM sessions WHERE user_id = ?').run(userId);
+  prepare('DELETE FROM sessions WHERE user_id = ?').run(userId);
 }
 
 // ─── Temp token helpers ─────────────────────────────────────────
 function createTempToken({ token, userId, type, expiresAt }) {
-  db.prepare(
+  prepare(
     'INSERT INTO temp_tokens (token, user_id, type, expires_at) VALUES (?, ?, ?, ?)'
   ).run(token, userId, type, expiresAt);
   return findTempToken(token);
 }
 
 function findTempToken(token) {
-  return db.prepare('SELECT * FROM temp_tokens WHERE token = ?').get(token);
+  return prepare('SELECT * FROM temp_tokens WHERE token = ?').get(token);
 }
 
 function deleteTempToken(token) {
-  db.prepare('DELETE FROM temp_tokens WHERE token = ?').run(token);
+  prepare('DELETE FROM temp_tokens WHERE token = ?').run(token);
 }
 
 function cleanExpiredTempTokens() {
   const now = Math.floor(Date.now() / 1000);
-  db.prepare('DELETE FROM temp_tokens WHERE expires_at < ?').run(now);
+  prepare('DELETE FROM temp_tokens WHERE expires_at < ?').run(now);
 }
 
 module.exports = {

@@ -125,8 +125,15 @@ router.post('/login/otp', (req, res) => {
   }
 
   const user = findUserByUsername(username);
-  if (!user || !user.otp_secret) {
-    return res.status(401).json({ error: 'Invalid credentials or OTP not set up' });
+  if (!user) {
+    return res.status(401).json({ error: 'Invalid credentials' });
+  }
+
+  if (!user.otp_secret) {
+    return res.status(400).json({
+      error: 'OTP not set up for this account. Use password login or visit /recover to reset OTP.',
+      recovery_url: '/recover.html',
+    });
   }
 
   const verified = speakeasy.totp.verify({ secret: user.otp_secret, encoding: 'base32', token: otp_code });
@@ -335,6 +342,34 @@ router.post('/otp/disable', authMiddleware, (req, res) => {
 
   updateUserOtp(req.user.id, null);
   res.json({ success: true, message: 'OTP has been disabled' });
+});
+
+// ─── POST /api/auth/recover/reset-otp ────────────────────────────
+// Allows a user to reset their OTP by providing username + password.
+// This lets users who enabled OTP but failed setup to regain access.
+router.post('/recover/reset-otp', async (req, res) => {
+  const { username, password } = req.body;
+
+  if (!username || !password) {
+    return res.status(400).json({ error: 'username and password are required' });
+  }
+
+  const user = findUserByUsername(username);
+  if (!user) {
+    return res.status(401).json({ error: 'Invalid credentials' });
+  }
+
+  const valid = await bcrypt.compare(password, user.password_hash);
+  if (!valid) {
+    return res.status(401).json({ error: 'Invalid credentials' });
+  }
+
+  // Clear any OTP secret so user can log in normally
+  updateUserOtp(user.id, null);
+  res.json({
+    success: true,
+    message: 'OTP has been reset. You can now log in with just your password.',
+  });
 });
 
 module.exports = router;

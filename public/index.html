@@ -225,7 +225,11 @@
             localStorage.setItem('auth_user', JSON.stringify(data.user));
             window.location.href = '/dashboard';
           } else {
-            showMsg(data.error || 'OTP login failed', 'error');
+            let msg = data.error || 'OTP login failed';
+            if (data.recovery_url) {
+              msg += ' <a href="' + data.recovery_url + '">Reset OTP here</a>';
+            }
+            showMsg(msg, 'error');
           }
         }
       } catch (err) {

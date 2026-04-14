@@ -37,7 +37,11 @@ jobs:
           # API key for action validation
           anthropic_api_key: ${{ secrets.ANTHROPIC_AUTH_TOKEN }}
 
-          # Set both API key and base URL for Claude Code runtime
-          claude_env: |
-            ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_AUTH_TOKEN }}
-            ANTHROPIC_BASE_URL: ${{ secrets.ANTHROPIC_BASE_URL }}
+          # Configure environment variables via settings
+          settings: |
+            {
+              "env": {
+                "ANTHROPIC_API_KEY": "${{ secrets.ANTHROPIC_AUTH_TOKEN }}",
+                "ANTHROPIC_BASE_URL": "${{ secrets.ANTHROPIC_BASE_URL }}"
+              }
+            }

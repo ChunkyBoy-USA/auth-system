@@ -39,7 +39,7 @@ jobs:
 
           # Use a model name the SDK recognizes
           claude_args: |
-            --model claude-3-5-sonnet-20241022
+            --model claude-sonnet-4-5
 
           # Configure environment variables via settings
           settings: |

@@ -15,10 +15,13 @@ function findUserById(id) {
 }
 
 function createUser({ username, passwordHash, subjectId }) {
-  const info = prepare(
+  prepare(
     'INSERT INTO users (username, password_hash, subject_id) VALUES (?, ?, ?)'
   ).run(username, passwordHash, subjectId);
-  return findUserById(info.lastInsertRowid);
+  // sql.js last_insert_rowid() can be unreliable across statements — query back
+  return prepare(
+    'SELECT * FROM users WHERE username = ? AND subject_id = ? ORDER BY id DESC LIMIT 1'
+  ).get(username, subjectId);
 }
 
 function updateUserOtp(userId, otpSecret) {

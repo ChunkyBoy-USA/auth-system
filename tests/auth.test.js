@@ -3,6 +3,59 @@ const { createApp } = require('../server');
 
 // Reuse a single app instance across all tests for speed.
 // Each test uses unique usernames to avoid collisions.
+
+describe('POST /api/auth/login/password — no OTP required', () => {
+  let app;
+
+  beforeAll(async () => {
+    app = await createApp();
+  });
+
+  // Bug #1 fix: user WITHOUT OTP can login with just password (no OTP prompt)
+  it('logs in successfully with just password when OTP is not set up', async () => {
+    await request(app)
+      .post('/api/auth/register')
+      .send({ username: 'nopassuser', password: 'pass123', subjectId: 1 });
+
+    const res = await request(app)
+      .post('/api/auth/login/password')
+      .send({ username: 'nopassuser', password: 'pass123' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.token).toBeTruthy();
+    expect(res.body.user).toBeTruthy();
+    expect(res.body.mfa_pending).toBeFalsy();
+  });
+
+  it('returns mfa_pending when user has OTP enabled and logs in with password', async () => {
+    // Register a user
+    await request(app)
+      .post('/api/auth/register')
+      .send({ username: 'hasotpuser', password: 'pass123', subjectId: 1 });
+
+    // Login and set up OTP
+    const loginRes = await request(app)
+      .post('/api/auth/login/password')
+      .send({ username: 'hasotpuser', password: 'pass123' });
+    const token = loginRes.body.token;
+
+    await request(app)
+      .post('/api/auth/otp/setup')
+      .set('Authorization', `Bearer ${token}`);
+
+    // Bug #2 fix: password login when OTP is set should return mfa_pending
+    const res = await request(app)
+      .post('/api/auth/login/password')
+      .send({ username: 'hasotpuser', password: 'pass123' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.mfa_pending).toBe(true);
+    expect(res.body.temp_token).toBeTruthy();
+    expect(res.body.message).toMatch(/OTP/i);
+  });
+});
+
 describe('POST /api/auth/login/otp — OTP not set up', () => {
   let app;
 

@@ -101,7 +101,7 @@
         selectedCredType = radio.value;
         document.getElementById('otpGroup').style.display = selectedCredType === 'otp' ? 'block' : 'none';
         document.getElementById('passwordGroup').style.display =
-          (selectedCredType === 'password' || selectedCredType === 'otp') ? 'block' : 'none';
+          selectedCredType === 'password' ? 'block' : 'none';
         document.getElementById('mfaGroup').style.display = 'none';
         document.getElementById('message').textContent = '';
       });

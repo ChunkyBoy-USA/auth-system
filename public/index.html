@@ -145,7 +145,14 @@
           showMsg(data.error || 'Passkey verification failed', 'error');
         }
       } catch (err) {
-        showMsg('Passkey error: ' + err.message, 'error');
+        const msg = err.message || '';
+        if (msg.includes('not supported') || msg.includes('NotSupportedError') || msg.includes('SecurityError')) {
+          showMsg('Platform passkey not available in this browser. Use Touch ID / Windows Hello on Chrome or Safari.', 'error');
+        } else if (msg.includes('NotAllowedError') || msg.includes('AbortError')) {
+          showMsg('Passkey cancelled or no platform authenticator found. Make sure Touch ID is enabled in browser settings.', 'error');
+        } else {
+          showMsg('Passkey error: ' + err.message, 'error');
+        }
       }
     }
 

@@ -33,8 +33,10 @@ async function createApp() {
 async function start() {
   const app = await createApp();
   const PORT = process.env.PORT || 3000;
-  app.listen(PORT, () => {
+  const HOST = process.env.HOST || '0.0.0.0';
+  app.listen(PORT, HOST, () => {
     console.log(`AuthSystem running at http://localhost:${PORT}`);
+    console.log(`On your network try: http://<your-mac-ip>:${PORT}`);
   });
   return app;
 }

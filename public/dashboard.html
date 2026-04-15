@@ -224,20 +224,16 @@
     async function registerPasskey() {
       try {
         const optsRes = await api('/api/auth/passkey/register-options', { method: 'POST' });
-        const rawText = await optsRes.text();
-        console.log('[passkey] raw response status:', optsRes.status, 'body:', rawText.substring(0, 200));
         if (!optsRes.ok) {
           showMsg('Server error ' + optsRes.status, 'error');
           return;
         }
-        const opts = JSON.parse(rawText);
-        // Defensive validation
+        const opts = await optsRes.json();
         if (!opts.challenge || !opts.user || !opts.user.id) {
-          showMsg('Invalid options from server: ' + JSON.stringify(opts), 'error');
+          showMsg('Invalid options from server', 'error');
           return;
         }
-        console.log('[passkey] calling startRegistration with challenge:', typeof opts.challenge, opts.challenge, 'user.id:', typeof opts.user.id, opts.user.id);
-        const credential = await SimpleWebAuthnBrowser.startRegistration({ optionsJSON: opts });
+        const credential = await SimpleWebAuthnBrowser.startRegistration(opts);
         const verifyRes = await api('/api/auth/passkey/register-verify', {
           method: 'POST',
           body: JSON.stringify(credential),
@@ -246,7 +242,6 @@
         if (data.success) { showMsg('Passkey registered!', 'success'); loadMe(); }
         else showMsg(data.error, 'error');
       } catch (err) {
-        console.error('[passkey] full error:', err);
         showMsg('Passkey error: ' + err.message, 'error');
       }
     }

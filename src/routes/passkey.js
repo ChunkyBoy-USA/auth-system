@@ -107,6 +107,7 @@ router.post('/login-options', async (req, res) => {
       {
         id: user.passkey_credential_id,
         type: 'public-key',
+        transports: ['internal'],
       },
     ],
     userVerification: 'preferred',

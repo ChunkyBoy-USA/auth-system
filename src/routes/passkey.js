@@ -12,17 +12,42 @@ const { parseDevice } = require('./passkey-helpers');
 
 const router = express.Router();
 
+// RP ID for WebAuthn — must match the origin the browser uses.
+// Set HOST environment variable to your machine's local IP when testing
+// cross-device (e.g. http://192.168.x.x:3000 on your phone).
+// Default: localhost (only works on the same device).
+function getRpId(req) {
+  const rpId = process.env.WEBAUTHN_RP_ID;
+  if (rpId) return rpId;
+  // Fall back to the origin hostname from the current request
+  const origin = req.get('origin') || req.headers.origin;
+  if (origin) {
+    try {
+      return new URL(origin).hostname;
+    } catch {}
+  }
+  return 'localhost';
+}
+
+function getRpOrigin(req) {
+  const rpId = getRpId(req);
+  const port = process.env.PORT || 3000;
+  return `http://${rpId}:${port}`;
+}
+
 // In-memory store for WebAuthn challenges (cleared on use/expiry)
 const challengeStore = new Map();
 
 // ─── POST /api/auth/passkey/register-options ───────────────────
 router.post('/register-options', authMiddleware, async (req, res) => {
   const user = req.user;
+  const rpId = getRpId(req);
+  const rpOrigin = getRpOrigin(req);
 
   // Promise.resolve() forces the thenable (v9.0.3) into a real Promise
   const options = await Promise.resolve(generateRegistrationOptions({
     rpName: 'AuthSystem',
-    rpID: 'localhost',
+    rpID: rpId,
     userName: user.username,
     userID: isoUint8Array.fromUTF8String(String(user.id)),
     timeout: 60000,
@@ -66,11 +91,13 @@ router.post('/register-verify', authMiddleware, async (req, res) => {
   }
 
   try {
+    const rpOrigin = getRpOrigin(req);
+    const rpId = getRpId(req);
     const verification = await verifyRegistrationResponse({
       response: body,
       expectedChallenge: stored.challenge,
-      expectedOrigin: 'http://localhost:3000',
-      expectedRPID: 'localhost',
+      expectedOrigin: rpOrigin,
+      expectedRPID: rpId,
     });
 
     const { credentialID, credentialPublicKey } = verification.registrationInfo;
@@ -102,7 +129,7 @@ router.post('/login-options', async (req, res) => {
   }
 
   const options = await Promise.resolve(generateAuthenticationOptions({
-    rpID: 'localhost',
+    rpID: getRpId(req),
     allowCredentials: [
       {
         id: user.passkey_credential_id,
@@ -111,6 +138,9 @@ router.post('/login-options', async (req, res) => {
     ],
     userVerification: 'preferred',
     timeout: 60000,
+    authenticatorSelection: {
+      authenticatorAttachment: 'platform',
+    },
   }));
 
   // Store challenge for verification
@@ -143,11 +173,13 @@ router.post('/login-verify', async (req, res) => {
   }
 
   try {
+    const rpOrigin = getRpOrigin(req);
+    const rpId = getRpId(req);
     const verification = await verifyAuthenticationResponse({
       response: body,
       expectedChallenge: stored.challenge,
-      expectedOrigin: 'http://localhost:3000',
-      expectedRPID: 'localhost',
+      expectedOrigin: rpOrigin,
+      expectedRPID: rpId,
       authenticator: {
         credentialID: user.passkey_credential_id,
         credentialPublicKey: isoBase64URL.toBuffer(user.passkey_public_key),

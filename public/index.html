@@ -104,6 +104,9 @@
           selectedCredType === 'password' ? 'block' : 'none';
         document.getElementById('mfaGroup').style.display = 'none';
         document.getElementById('message').textContent = '';
+        // Reset MFA state when switching credential types
+        currentTempToken = null;
+        storedUsername = null;
       });
     });
 
@@ -178,6 +181,9 @@
           if (data.success) {
             localStorage.setItem('auth_token', data.token);
             localStorage.setItem('auth_user', JSON.stringify(data.user));
+            // Reset MFA state before redirect
+            currentTempToken = null;
+            storedUsername = null;
             window.location.href = '/dashboard';
           } else {
             showMsg(data.error || 'MFA verification failed', 'error');
@@ -206,6 +212,9 @@
           } else if (data.success) {
             localStorage.setItem('auth_token', data.token);
             localStorage.setItem('auth_user', JSON.stringify(data.user));
+            // Reset MFA state before redirect
+            currentTempToken = null;
+            storedUsername = null;
             window.location.href = '/dashboard';
           } else {
             showMsg(data.error || 'Login failed', 'error');
@@ -223,6 +232,9 @@
           if (data.success) {
             localStorage.setItem('auth_token', data.token);
             localStorage.setItem('auth_user', JSON.stringify(data.user));
+            // Reset MFA state before redirect
+            currentTempToken = null;
+            storedUsername = null;
             window.location.href = '/dashboard';
           } else {
             let msg = data.error || 'OTP login failed';

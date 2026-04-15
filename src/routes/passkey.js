@@ -26,6 +26,11 @@ router.post('/register-options', authMiddleware, async (req, res) => {
     userName: user.username,
     userID: isoUint8Array.fromUTF8String(String(user.id)),
     timeout: 60000,
+    authenticatorSelection: {
+      authenticatorAttachment: 'platform',
+      residentKey: 'preferred',
+      userVerification: 'preferred',
+    },
   }));
 
   // Convert user.id from Uint8Array to base64url string so it serialises

@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AuthSystem — Login</title>
+  <link rel="stylesheet" href="/style.css" />
+  <script src="/lib/simplewebauthn-browser.umd.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <div class="logo">🔐 AuthSystem</div>
+      <h1>Sign In</h1>
+
+      <!-- Subject type tabs -->
+      <div class="tabs">
+        <button class="tab active" data-type="member">Member</button>
+        <button class="tab" data-type="community_staff">Community Staff</button>
+        <button class="tab" data-type="platform_staff">Platform Staff</button>
+      </div>
+
+      <!-- Login form -->
+      <form id="loginForm">
+        <div class="form-group">
+          <label for="username">Username</label>
+          <input type="text" id="username" name="username" placeholder="Enter username" required />
+        </div>
+
+        <div class="form-group" id="passwordGroup">
+          <label for="password">Password</label>
+          <input type="password" id="password" name="password" placeholder="Enter password" />
+        </div>
+
+        <!-- Credential type selector -->
+        <div class="cred-selector">
+          <span class="cred-label">Sign in with:</span>
+          <div class="cred-options">
+            <label class="cred-option">
+              <input type="radio" name="cred_type" value="password" checked />
+              <span>Password</span>
+            </label>
+            <label class="cred-option">
+              <input type="radio" name="cred_type" value="otp" />
+              <span>OTP</span>
+            </label>
+            <label class="cred-option" id="passkeyOption">
+              <input type="radio" name="cred_type" value="passkey" />
+              <span>Passkey</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- OTP code input (shown when OTP selected) -->
+        <div class="form-group" id="otpGroup" style="display:none">
+          <label for="otp_code">OTP Code</label>
+          <input type="text" id="otp_code" name="otp_code" placeholder="6-digit code from authenticator" maxlength="6" />
+        </div>
+
+        <!-- MFA OTP step (hidden initially) -->
+        <div class="form-group" id="mfaGroup" style="display:none">
+          <label for="mfa_code">Enter OTP code to complete login</label>
+          <input type="text" id="mfa_code" name="mfa_code" placeholder="6-digit code" maxlength="6" />
+          <input type="hidden" id="mfa_temp_token" />
+          <p class="hint" id="mfaMessage"></p>
+        </div>
+
+        <button type="submit" class="btn primary" id="submitBtn">Sign In</button>
+      </form>
+
+      <p class="hint" id="message"></p>
+
+      <div class="footer-links">
+        Don't have an account?
+        <a href="/register.html">Register here</a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ── State ─────────────────────────────────────────────────────
+    let selectedSubjectType = 'member';
+    let selectedCredType = 'password';
+    let currentTempToken = null;
+    let storedUsername = null;
+
+    const subjectTypeMap = { member: 1, community_staff: 2, platform_staff: 3 };
+
+    // ── Subject type tabs ─────────────────────────────────────────
+    document.querySelectorAll('.tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        selectedSubjectType = btn.dataset.type;
+      });
+    });
+
+    // ── Credential type selector ───────────────────────────────────
+    document.querySelectorAll('input[name="cred_type"]').forEach(radio => {
+      radio.addEventListener('change', () => {
+        selectedCredType = radio.value;
+        document.getElementById('otpGroup').style.display = selectedCredType === 'otp' ? 'block' : 'none';
+        document.getElementById('passwordGroup').style.display =
+          selectedCredType === 'password' ? 'block' : 'none';
+        document.getElementById('mfaGroup').style.display = 'none';
+        document.getElementById('message').textContent = '';
+        // Reset MFA state when switching credential types
+        currentTempToken = null;
+        storedUsername = null;
+      });
+    });
+
+    // ── Passkey button ─────────────────────────────────────────────
+    async function tryPasskeyLogin() {
+      const username = document.getElementById('username').value.trim();
+      if (!username) {
+        showMsg('Enter username first to use passkey', 'error');
+        return;
+      }
+      try {
+        // Step 1: get assertion options
+        const optsRes = await fetch('/api/auth/passkey/login-options', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username }),
+        });
+        if (!optsRes.ok) { showMsg('No passkey found for this user', 'error'); return; }
+        const opts = await optsRes.json();
+
+        // Step 2: get assertion from browser
+        const assertion = await SimpleWebAuthnBrowser.startAuthentication(opts);
+
+        // Step 3: verify on server
+        const verifyRes = await fetch('/api/auth/passkey/login-verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, body: assertion }),
+        });
+        const data = await verifyRes.json();
+        if (data.success) {
+          localStorage.setItem('auth_token', data.token);
+          localStorage.setItem('auth_user', JSON.stringify(data.user));
+          window.location.href = '/dashboard';
+        } else {
+          showMsg(data.error || 'Passkey verification failed', 'error');
+        }
+      } catch (err) {
+        const msg = err.message || '';
+        if (msg.includes('not supported') || msg.includes('NotSupportedError') || msg.includes('SecurityError')) {
+          showMsg('Platform passkey not available in this browser. Use Touch ID / Windows Hello on Chrome or Safari.', 'error');
+        } else if (msg.includes('NotAllowedError') || msg.includes('AbortError')) {
+          showMsg('Passkey cancelled or no platform authenticator found. Make sure Touch ID is enabled in browser settings.', 'error');
+        } else {
+          showMsg('Passkey error: ' + err.message, 'error');
+        }
+      }
+    }
+
+    // Listen for passkey radio change
+    document.querySelectorAll('input[name="cred_type"]').forEach(radio => {
+      if (radio.value === 'passkey') {
+        radio.addEventListener('change', tryPasskeyLogin);
+      }
+    });
+
+    // ── Form submit ────────────────────────────────────────────────
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value;
+      const otpCode = document.getElementById('otp_code').value.trim();
+      const mfaCode = document.getElementById('mfa_code').value.trim();
+      const messageEl = document.getElementById('message');
+      const submitBtn = document.getElementById('submitBtn');
+
+      messageEl.textContent = '';
+      submitBtn.disabled = true;
+
+      try {
+        // ── MFA verify step ────────────────────────────────────────
+        if (currentTempToken) {
+          const res = await fetch('/api/auth/mfa/verify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ temp_token: currentTempToken, otp_code: mfaCode }),
+          });
+          const data = await res.json();
+          if (data.success) {
+            localStorage.setItem('auth_token', data.token);
+            localStorage.setItem('auth_user', JSON.stringify(data.user));
+            // Reset MFA state before redirect
+            currentTempToken = null;
+            storedUsername = null;
+            window.location.href = '/dashboard';
+          } else {
+            showMsg(data.error || 'MFA verification failed', 'error');
+          }
+          submitBtn.disabled = false;
+          return;
+        }
+
+        // ── Password login ────────────────────────────────────────
+        if (selectedCredType === 'password') {
+          const res = await fetch('/api/auth/login/password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password }),
+          });
+          const data = await res.json();
+
+          if (data.mfa_pending) {
+            // MFA required — show OTP input
+            currentTempToken = data.temp_token;
+            storedUsername = username;
+            document.getElementById('passwordGroup').style.display = 'none';
+            document.getElementById('mfaGroup').style.display = 'block';
+            document.getElementById('mfaMessage').textContent = data.message;
+            showMsg(data.message, 'info');
+          } else if (data.success) {
+            localStorage.setItem('auth_token', data.token);
+            localStorage.setItem('auth_user', JSON.stringify(data.user));
+            // Reset MFA state before redirect
+            currentTempToken = null;
+            storedUsername = null;
+            window.location.href = '/dashboard';
+          } else {
+            showMsg(data.error || 'Login failed', 'error');
+          }
+        }
+
+        // ── OTP login ──────────────────────────────────────────────
+        else if (selectedCredType === 'otp') {
+          const res = await fetch('/api/auth/login/otp', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, otp_code: otpCode }),
+          });
+          const data = await res.json();
+          if (data.success) {
+            localStorage.setItem('auth_token', data.token);
+            localStorage.setItem('auth_user', JSON.stringify(data.user));
+            // Reset MFA state before redirect
+            currentTempToken = null;
+            storedUsername = null;
+            window.location.href = '/dashboard';
+          } else {
+            let msg = data.error || 'OTP login failed';
+            if (data.recovery_url) {
+              msg += ' <a href="' + data.recovery_url + '">Reset OTP here</a>';
+            }
+            showMsg(msg, 'error');
+          }
+        }
+      } catch (err) {
+        showMsg('Network error: ' + err.message, 'error');
+      }
+
+      submitBtn.disabled = false;
+    });
+
+    function showMsg(msg, type) {
+      const el = document.getElementById('message');
+      el.textContent = msg;
+      el.className = type;
+    }
+  </script>
+</body>
+</html>

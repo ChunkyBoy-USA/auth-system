@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AuthSystem — Reset OTP</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <nav class="navbar">
+    <div class="nav-brand">🔐 AuthSystem</div>
+    <a href="/" class="btn outline" style="text-decoration:none">Back to Login</a>
+  </nav>
+
+  <div class="container">
+    <div class="card" style="max-width:480px;margin:40px auto;">
+      <div class="logo">🔑</div>
+      <h1>Reset OTP</h1>
+      <p class="hint" style="margin-bottom:20px;">
+        If you enabled OTP but couldn't set up your authenticator app,
+        enter your username and password to reset OTP and log in normally.
+      </p>
+
+      <form id="recoverForm">
+        <div class="form-group">
+          <label for="username">Username</label>
+          <input type="text" id="username" name="username" placeholder="Enter your username" required />
+        </div>
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input type="password" id="password" name="password" placeholder="Enter your password" required />
+        </div>
+        <button type="submit" class="btn primary" id="submitBtn">Reset OTP</button>
+      </form>
+
+      <p class="hint" id="message"></p>
+    </div>
+  </div>
+
+  <script>
+    document.getElementById('recoverForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value;
+      const messageEl = document.getElementById('message');
+      const submitBtn = document.getElementById('submitBtn');
+
+      messageEl.textContent = '';
+      submitBtn.disabled = true;
+
+      try {
+        const res = await fetch('/api/auth/recover/reset-otp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password }),
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          messageEl.textContent = data.message + ' Redirecting to login...';
+          messageEl.className = 'success';
+          setTimeout(() => window.location.href = '/', 2000);
+        } else {
+          messageEl.textContent = data.error || 'Reset failed';
+          messageEl.className = 'error';
+        }
+      } catch (err) {
+        messageEl.textContent = 'Network error: ' + err.message;
+        messageEl.className = 'error';
+      }
+
+      submitBtn.disabled = false;
+    });
+  </script>
+</body>
+</html>

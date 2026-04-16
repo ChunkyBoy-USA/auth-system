@@ -113,11 +113,15 @@
       // OTP section
       if (user.hasOtp) {
         document.getElementById('otpStatus').style.display = 'none';
+        document.getElementById('otpSetup').style.display = 'none';
+        document.getElementById('otpDisableSection').style.display = 'none';
         document.getElementById('otpEnabled').style.display = 'block';
       } else {
         document.getElementById('otpStatus').style.display = 'block';
         document.getElementById('otpStatus').innerHTML = '<button class="btn primary" onclick="setupOtp()">Set Up OTP</button>';
         document.getElementById('otpSetup').style.display = 'none';
+        document.getElementById('otpEnabled').style.display = 'none';
+        document.getElementById('otpDisableSection').style.display = 'none';
       }
 
       // Passkey section

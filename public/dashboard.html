@@ -224,8 +224,16 @@
     async function registerPasskey() {
       try {
         const optsRes = await api('/api/auth/passkey/register-options', { method: 'POST' });
+        if (!optsRes.ok) {
+          showMsg('Server error ' + optsRes.status, 'error');
+          return;
+        }
         const opts = await optsRes.json();
-        const credential = await SimpleWebAuthnBrowser.startRegistration({ optionsJSON: opts });
+        if (!opts.challenge || !opts.user || !opts.user.id) {
+          showMsg('Invalid options from server', 'error');
+          return;
+        }
+        const credential = await SimpleWebAuthnBrowser.startRegistration(opts);
         const verifyRes = await api('/api/auth/passkey/register-verify', {
           method: 'POST',
           body: JSON.stringify(credential),

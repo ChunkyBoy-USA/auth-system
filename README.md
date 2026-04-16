@@ -2,11 +2,37 @@
 
 A modern, multi-factor authentication system demonstrating secure user authentication with support for passwords, time-based one-time passwords (TOTP), and passkeys (WebAuthn). Built as a comprehensive reference implementation for authentication best practices.
 
+## 🚀 Live Demo
+
+**[Try the live demo here](https://auth-system-jr80.onrender.com)** 
+
+> **Note**: The demo is hosted on Render.com's free tier and may take 30-60 seconds to wake up on first access after inactivity.
+
+### Demo Credentials
+You can register your own account or use these test accounts:
+- **Username**: `demo_member` | **Password**: `demo123` (Member role)
+- **Username**: `demo_staff` | **Password**: `demo123` (Community Staff role)
+
+### What to Try
+1. 🔐 **Register** a new account with any of the three subject types
+2. 🔑 **Login** with password authentication
+3. 📱 **Set up OTP** using Google Authenticator or Authy
+4. 🎯 **Enable MFA** to require both password + OTP
+5. 🔒 **Register a Passkey** for passwordless login (requires HTTPS)
+6. 📊 **View Sessions** and manage multi-device logins
+7. 🚪 **Logout** from individual devices or all at once
+
 ## What is this project?
 
 AuthSystem is a full-stack authentication demo that showcases multiple authentication methods and session management patterns. It implements a role-based access control system with three subject types (Member, Community Staff, Platform Staff) and provides a complete authentication flow from registration to session management.
 
 This project serves as both a learning resource and a foundation for building secure authentication systems in Node.js applications.
+
+## 🎬 Demo Animation
+
+![AuthSystem Demo](docs/demo.gif)
+
+*Demonstration of registration, login, OTP setup, and session management flows*
 
 ## Features
 
@@ -192,6 +218,8 @@ HOST=192.168.x.x npm start
 
 ### Running Tests
 
+#### Unit Tests (Backend API)
+
 ```bash
 npm test
 ```
@@ -202,6 +230,82 @@ The test suite includes:
 - OTP setup and verification tests
 - Passkey registration and authentication tests
 - Edge case and error handling tests
+
+**Test Coverage**: 170 tests covering all API endpoints and edge cases
+
+#### UI/E2E Tests (Frontend)
+
+```bash
+# Run all UI tests (headless)
+npm run test:ui
+
+# Run with visible browser
+npm run test:ui:headed
+
+# Debug tests with Playwright Inspector
+npm run test:ui:debug
+```
+
+The UI test suite includes:
+- **Registration flows** - Form validation, successful registration, duplicate handling
+- **Login flows** - Credential validation, error handling, dashboard navigation
+- **Dashboard** - Profile display, session management, logout functionality
+- **OTP setup** - QR code display, code validation, enable/disable flows
+- **Session management** - Multi-device sessions, revocation, logout-all
+
+**UI Test Coverage**: 28 end-to-end tests across 4 test suites
+
+For more details on UI testing, see [e2e/README.md](e2e/README.md).
+
+## 🧪 Testing Strategy
+
+This project includes comprehensive testing at multiple levels:
+
+### Test Pyramid
+
+```
+        /\
+       /UI\         28 E2E tests (Playwright)
+      /----\
+     /Unit  \       170 API tests (Jest + Supertest)
+    /--------\
+   /Integration\    Full stack coverage
+  /--------------\
+```
+
+### Backend Tests (Jest + Supertest)
+- **170 tests** covering all API endpoints
+- **91%+ code coverage**
+- Tests run against real SQLite database
+- Isolated test data with unique identifiers
+- Mock-free for integration testing authenticity
+
+### Frontend Tests (Playwright)
+- **28 E2E tests** simulating real user interactions
+- Tests run in Chromium browser
+- Auto-starts server before test execution
+- Screenshots on failure for debugging
+- Sequential execution to avoid database conflicts
+
+### Test Organization
+
+```
+tests/                          # Backend unit/integration tests
+├── auth.test.js               # Core authentication
+├── auth-session.test.js       # Session management
+├── auth-edge-cases.test.js    # Error handling
+├── otp.test.js                # OTP flows
+├── passkey.test.js            # Passkey basics
+├── passkey-success.test.js    # Passkey success paths
+├── passkey-edge-cases.test.js # Passkey error handling
+└── server.test.js             # Static file serving
+
+e2e/                           # Frontend E2E tests
+├── auth-registration.spec.js  # Registration flows
+├── auth-login.spec.js         # Login flows
+├── dashboard.spec.js          # Dashboard interactions
+└── otp.spec.js                # OTP UI flows
+```
 
 ## API Endpoints
 
@@ -295,6 +399,51 @@ curl -X POST http://localhost:3000/api/auth/otp/enable \
 - For production use, consider migrating to PostgreSQL or MySQL
 - WebAuthn requires HTTPS in production (localhost works for development)
 - TOTP codes are valid for 30 seconds with a standard time window
+
+## 🚀 Deployment
+
+### Deploy to Render.com (Free)
+
+1. Fork this repository to your GitHub account
+
+2. Sign up at [Render.com](https://render.com)
+
+3. Create a new Web Service:
+   - Connect your GitHub repository
+   - Select the `auth-system` repository
+   - Render will auto-detect the `render.yaml` configuration
+   - Click "Create Web Service"
+
+4. Your app will be deployed at `https://your-app-name.onrender.com`
+
+**Note**: Free tier services spin down after 15 minutes of inactivity and take 30-60 seconds to wake up.
+
+### Deploy to Other Platforms
+
+#### Heroku
+```bash
+heroku create your-app-name
+git push heroku main
+```
+
+#### Railway
+```bash
+railway init
+railway up
+```
+
+#### Vercel (Serverless)
+```bash
+vercel --prod
+```
+
+### Environment Variables for Production
+
+Set these in your hosting platform:
+- `NODE_ENV=production`
+- `PORT` (usually auto-set by platform)
+- `WEBAUTHN_RP_ID` (your domain, e.g., `your-app.onrender.com`)
+- `WEBAUTHN_ORIGIN` (full URL, e.g., `https://your-app.onrender.com`)
 
 ## License
 

@@ -113,11 +113,15 @@
       // OTP section
       if (user.hasOtp) {
         document.getElementById('otpStatus').style.display = 'none';
+        document.getElementById('otpSetup').style.display = 'none';
+        document.getElementById('otpDisableSection').style.display = 'none';
         document.getElementById('otpEnabled').style.display = 'block';
       } else {
         document.getElementById('otpStatus').style.display = 'block';
         document.getElementById('otpStatus').innerHTML = '<button class="btn primary" onclick="setupOtp()">Set Up OTP</button>';
         document.getElementById('otpSetup').style.display = 'none';
+        document.getElementById('otpEnabled').style.display = 'none';
+        document.getElementById('otpDisableSection').style.display = 'none';
       }
 
       // Passkey section
@@ -153,7 +157,7 @@
     }
 
     async function revokeSession(sessionId) {
-      const res = await api(`/api/auth/session/${sessionId}`, { method: 'DELETE' });
+      const res = await api(`/api/auth/sessions/${sessionId}`, { method: 'DELETE' });
       if (res.ok) loadSessions();
       else showMsg('Failed to revoke session', 'error');
     }
@@ -168,7 +172,9 @@
     async function logoutAll() {
       if (!confirm('Logout all devices?')) return;
       await api('/api/auth/logout-all', { method: 'POST' });
-      loadSessions();
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('auth_user');
+      window.location.href = '/';
     }
 
     // OTP setup — only called when user clicks the setup button

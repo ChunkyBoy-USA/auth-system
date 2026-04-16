@@ -56,7 +56,13 @@ describe('OTP Authentication Endpoints', () => {
       };
 
       speakeasy.generateSecret.mockReturnValue(mockSecret);
-      models.updateUserOtp.mockReturnValue({ ...mockUser, otp_secret: mockSecret.base32 });
+      models.createTempToken.mockReturnValue({
+        token: 'setup-token-123',
+        user_id: mockUser.id,
+        type: 'otp_setup_pending',
+        expires_at: Math.floor(Date.now() / 1000) + 600,
+        data: mockSecret.base32,
+      });
 
       const response = await request(app)
         .post('/api/auth/otp/setup')
@@ -66,6 +72,7 @@ describe('OTP Authentication Endpoints', () => {
       expect(response.status).toBe(200);
       expect(response.body).toHaveProperty('secret', mockSecret.base32);
       expect(response.body).toHaveProperty('otpauthUri', mockSecret.otpauth_url);
+      expect(response.body).toHaveProperty('setupToken');
       expect(response.body).toHaveProperty('message');
 
       expect(speakeasy.generateSecret).toHaveBeenCalledWith({
@@ -73,7 +80,7 @@ describe('OTP Authentication Endpoints', () => {
         issuer: 'AuthSystem',
         length: 20,
       });
-      expect(models.updateUserOtp).toHaveBeenCalledWith(mockUser.id, mockSecret.base32);
+      expect(models.createTempToken).toHaveBeenCalled();
     });
 
     it('should return 400 if OTP is already set up', async () => {
@@ -103,37 +110,52 @@ describe('OTP Authentication Endpoints', () => {
   });
 
   describe('POST /api/auth/otp/enable', () => {
+    let mockTempToken;
+
     beforeEach(() => {
-      mockUser.otp_secret = 'JBSWY3DPEHPK3PXP';
+      mockUser.otp_secret = null; // User hasn't enabled OTP yet
       models.findUserById.mockReturnValue(mockUser);
+
+      mockTempToken = {
+        token: 'setup-token-123',
+        user_id: mockUser.id,
+        type: 'otp_setup_pending',
+        expires_at: Math.floor(Date.now() / 1000) + 600,
+        data: 'JBSWY3DPEHPK3PXP',
+      };
     });
 
     it('should enable OTP when valid code is provided', async () => {
+      models.findTempToken.mockReturnValue(mockTempToken);
       speakeasy.totp.verify.mockReturnValue(true);
+      models.updateUserOtp.mockReturnValue({ ...mockUser, otp_secret: mockTempToken.data });
 
       const response = await request(app)
         .post('/api/auth/otp/enable')
         .set('Authorization', 'Bearer session-123')
-        .send({ otp_code: '123456' });
+        .send({ otp_code: '123456', setupToken: 'setup-token-123' });
 
       expect(response.status).toBe(200);
       expect(response.body).toHaveProperty('success', true);
       expect(response.body).toHaveProperty('message', 'OTP is now enabled');
 
       expect(speakeasy.totp.verify).toHaveBeenCalledWith({
-        secret: mockUser.otp_secret,
+        secret: mockTempToken.data,
         encoding: 'base32',
         token: '123456',
       });
+      expect(models.updateUserOtp).toHaveBeenCalledWith(mockUser.id, mockTempToken.data);
+      expect(models.deleteTempToken).toHaveBeenCalledWith('setup-token-123');
     });
 
     it('should return 401 when invalid OTP code is provided', async () => {
+      models.findTempToken.mockReturnValue(mockTempToken);
       speakeasy.totp.verify.mockReturnValue(false);
 
       const response = await request(app)
         .post('/api/auth/otp/enable')
         .set('Authorization', 'Bearer session-123')
-        .send({ otp_code: '000000' });
+        .send({ otp_code: '000000', setupToken: 'setup-token-123' });
 
       expect(response.status).toBe(401);
       expect(response.body).toHaveProperty('error', 'Invalid OTP code — setup not confirmed');
@@ -143,23 +165,32 @@ describe('OTP Authentication Endpoints', () => {
       const response = await request(app)
         .post('/api/auth/otp/enable')
         .set('Authorization', 'Bearer session-123')
-        .send({});
+        .send({ setupToken: 'setup-token-123' });
 
       expect(response.status).toBe(400);
-      expect(response.body).toHaveProperty('error', 'otp_code is required');
+      expect(response.body).toHaveProperty('error', 'otp_code and setupToken are required');
     });
 
-    it('should return 400 if OTP is not set up', async () => {
-      mockUser.otp_secret = null;
-      models.findUserById.mockReturnValue(mockUser);
-
+    it('should return 400 if setupToken is missing', async () => {
       const response = await request(app)
         .post('/api/auth/otp/enable')
         .set('Authorization', 'Bearer session-123')
         .send({ otp_code: '123456' });
 
       expect(response.status).toBe(400);
-      expect(response.body).toHaveProperty('error', 'OTP not set up. Call /otp/setup first.');
+      expect(response.body).toHaveProperty('error', 'otp_code and setupToken are required');
+    });
+
+    it('should return 401 if setup token is invalid', async () => {
+      models.findTempToken.mockReturnValue(null);
+
+      const response = await request(app)
+        .post('/api/auth/otp/enable')
+        .set('Authorization', 'Bearer session-123')
+        .send({ otp_code: '123456', setupToken: 'invalid-token' });
+
+      expect(response.status).toBe(401);
+      expect(response.body.error).toMatch(/token/i);
     });
   });
 
@@ -353,14 +384,22 @@ describe('OTP Authentication Endpoints', () => {
     });
 
     it('should use speakeasy.totp.verify with correct parameters', async () => {
-      mockUser.otp_secret = 'JBSWY3DPEHPK3PXP';
+      const mockTempToken = {
+        token: 'setup-token-123',
+        user_id: mockUser.id,
+        type: 'otp_setup_pending',
+        expires_at: Math.floor(Date.now() / 1000) + 600,
+        data: 'JBSWY3DPEHPK3PXP',
+      };
+
+      models.findTempToken.mockReturnValue(mockTempToken);
       models.findUserById.mockReturnValue(mockUser);
       speakeasy.totp.verify.mockReturnValue(true);
 
       await request(app)
         .post('/api/auth/otp/enable')
         .set('Authorization', 'Bearer session-123')
-        .send({ otp_code: '123456' });
+        .send({ otp_code: '123456', setupToken: 'setup-token-123' });
 
       expect(speakeasy.totp.verify).toHaveBeenCalledWith({
         secret: 'JBSWY3DPEHPK3PXP',

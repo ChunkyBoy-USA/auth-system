@@ -19,7 +19,7 @@ const router = express.Router();
 function getRpId(req) {
   const rpId = process.env.WEBAUTHN_RP_ID;
   if (rpId) return rpId;
-  // Fall back to the origin hostname from the current request
+
   const origin = req.get('origin') || req.headers.origin;
   if (origin) {
     try {
@@ -30,9 +30,18 @@ function getRpId(req) {
 }
 
 function getRpOrigin(req) {
-  const rpId = getRpId(req);
+  // Use the origin the browser actually sent (from the Host/Forwarded headers
+  // ngrok sets), so it matches what @simplewebauthn/server validates against.
+  const origin = req.get('origin') || req.headers.origin;
+  if (origin) {
+    try {
+      const url = new URL(origin);
+      return `${url.protocol}//${url.host}`;
+    } catch {}
+  }
+  // Fallback for local dev: respect WEBAUTHN_ORIGIN env var if set, else localhost
   const port = process.env.PORT || 3000;
-  return `http://${rpId}:${port}`;
+  return `http://localhost:${port}`;
 }
 
 // In-memory store for WebAuthn challenges (cleared on use/expiry)
@@ -52,8 +61,7 @@ router.post('/register-options', authMiddleware, async (req, res) => {
     userID: isoUint8Array.fromUTF8String(String(user.id)),
     timeout: 60000,
     authenticatorSelection: {
-      authenticatorAttachment: 'platform',
-      residentKey: 'preferred',
+      residentKey: 'required',
       userVerification: 'preferred',
     },
   }));
@@ -100,11 +108,25 @@ router.post('/register-verify', authMiddleware, async (req, res) => {
       expectedRPID: rpId,
     });
 
-    const { credentialID, credentialPublicKey } = verification.registrationInfo;
+    // In @simplewebauthn/server v9+, the structure can vary
+    // Check both possible locations for credential data
+    let credentialId, credentialPublicKey;
+
+    if (verification.registrationInfo.credential) {
+      // v9.0.3+ format
+      credentialId = verification.registrationInfo.credential.id;
+      credentialPublicKey = verification.registrationInfo.credential.publicKey;
+    } else if (verification.registrationInfo.credentialID) {
+      // Older v9 format
+      credentialId = isoBase64URL.fromBuffer(verification.registrationInfo.credentialID);
+      credentialPublicKey = verification.registrationInfo.credentialPublicKey;
+    } else {
+      throw new Error('Unexpected credential format from verifyRegistrationResponse');
+    }
 
     updateUserPasskey(
       user.id,
-      isoBase64URL.fromBuffer(credentialID),
+      credentialId,
       isoBase64URL.fromBuffer(credentialPublicKey)
     );
 
@@ -132,15 +154,13 @@ router.post('/login-options', async (req, res) => {
     rpID: getRpId(req),
     allowCredentials: [
       {
-        id: user.passkey_credential_id,
+        id: isoBase64URL.toBuffer(user.passkey_credential_id),
         type: 'public-key',
+        transports: ['internal', 'hybrid'],
       },
     ],
     userVerification: 'preferred',
     timeout: 60000,
-    authenticatorSelection: {
-      authenticatorAttachment: 'platform',
-    },
   }));
 
   // Store challenge for verification
@@ -155,8 +175,7 @@ router.post('/login-options', async (req, res) => {
 
 // ─── POST /api/auth/passkey/login-verify ───────────────────────
 router.post('/login-verify', async (req, res) => {
-  const { body } = req;
-  const { username } = req.body;
+  const { username, body } = req.body;
 
   if (!username) {
     return res.status(400).json({ error: 'username is required' });
@@ -165,6 +184,10 @@ router.post('/login-verify', async (req, res) => {
   const user = findUserByUsername(username);
   if (!user || !user.passkey_credential_id) {
     return res.status(404).json({ error: 'User or passkey not found' });
+  }
+
+  if (!body || !body.id) {
+    return res.status(400).json({ error: 'Missing credential ID' });
   }
 
   const stored = challengeStore.get(`auth:${user.id}`);
@@ -181,7 +204,7 @@ router.post('/login-verify', async (req, res) => {
       expectedOrigin: rpOrigin,
       expectedRPID: rpId,
       authenticator: {
-        credentialID: user.passkey_credential_id,
+        credentialID: isoBase64URL.toBuffer(user.passkey_credential_id),
         credentialPublicKey: isoBase64URL.toBuffer(user.passkey_public_key),
       },
     });

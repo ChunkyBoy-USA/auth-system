@@ -143,9 +143,19 @@ describe('POST /api/auth/recover/reset-otp', () => {
       .send({ username: 'recoveruser', password: 'pass123' });
     const token = loginRes.body.token;
 
-    await request(app)
+    // Setup OTP
+    const setupRes = await request(app)
       .post('/api/auth/otp/setup')
       .set('Authorization', `Bearer ${token}`);
+    const { secret, setupToken } = setupRes.body;
+
+    // Enable OTP with valid code
+    const speakeasy = require('speakeasy');
+    const validCode = speakeasy.totp({ secret, encoding: 'base32' });
+    await request(app)
+      .post('/api/auth/otp/enable')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ otp_code: validCode, setupToken });
 
     // Verify MFA is required after enabling OTP
     const beforeRes = await request(app)

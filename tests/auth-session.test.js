@@ -285,10 +285,18 @@ describe('POST /api/auth/otp/setup', () => {
     await register(name);
     const token = await getToken(name);
     // Set up OTP once
-    await request(app)
+    const setupRes = await request(app)
       .post('/api/auth/otp/setup')
       .set('Authorization', `Bearer ${token}`);
-    // Try again — should fail
+    const { secret, setupToken } = setupRes.body;
+    // Enable it
+    const speakeasy = require('speakeasy');
+    const validCode = speakeasy.totp({ secret, encoding: 'base32' });
+    await request(app)
+      .post('/api/auth/otp/enable')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ otp_code: validCode, setupToken });
+    // Try to setup again — should fail
     const res = await request(app)
       .post('/api/auth/otp/setup')
       .set('Authorization', `Bearer ${token}`);
@@ -323,10 +331,13 @@ describe('POST /api/auth/otp/enable', () => {
     const name = uid('ennootp');
     await register(name);
     const token = await getToken(name);
+    const setupRes = await request(app)
+      .post('/api/auth/otp/setup')
+      .set('Authorization', `Bearer ${token}`);
     const res = await request(app)
       .post('/api/auth/otp/enable')
       .set('Authorization', `Bearer ${token}`)
-      .send({});
+      .send({ setupToken: setupRes.body.setupToken });
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/required/i);
   });
@@ -338,9 +349,9 @@ describe('POST /api/auth/otp/enable', () => {
     const res = await request(app)
       .post('/api/auth/otp/enable')
       .set('Authorization', `Bearer ${token}`)
-      .send({ otp_code: '000000' });
-    expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/setup/i);
+      .send({ otp_code: '000000', setupToken: 'invalid-token' });
+    expect(res.status).toBe(401);
+    expect(res.body.error).toMatch(/token/i);
   });
 
   it('returns 401 for wrong OTP code', async () => {
@@ -348,14 +359,14 @@ describe('POST /api/auth/otp/enable', () => {
     await register(name);
     const token = await getToken(name);
     // Set up OTP
-    await request(app)
+    const setupRes = await request(app)
       .post('/api/auth/otp/setup')
       .set('Authorization', `Bearer ${token}`);
     // Try to enable with wrong code
     const res = await request(app)
       .post('/api/auth/otp/enable')
       .set('Authorization', `Bearer ${token}`)
-      .send({ otp_code: '000000' });
+      .send({ otp_code: '000000', setupToken: setupRes.body.setupToken });
     expect(res.status).toBe(401);
     expect(res.body.error).toMatch(/invalid/i);
   });
@@ -399,9 +410,17 @@ describe('POST /api/auth/otp/disable', () => {
     await register(name);
     const token = await getToken(name);
     // Set up OTP first
-    await request(app)
+    const setupRes = await request(app)
       .post('/api/auth/otp/setup')
       .set('Authorization', `Bearer ${token}`);
+    const { secret, setupToken } = setupRes.body;
+    // Enable it with valid code
+    const speakeasy = require('speakeasy');
+    const validCode = speakeasy.totp({ secret, encoding: 'base32' });
+    await request(app)
+      .post('/api/auth/otp/enable')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ otp_code: validCode, setupToken });
     // Try to disable with wrong code
     const res = await request(app)
       .post('/api/auth/otp/disable')
@@ -419,14 +438,14 @@ describe('POST /api/auth/otp/disable', () => {
     const setupRes = await request(app)
       .post('/api/auth/otp/setup')
       .set('Authorization', `Bearer ${token}`);
-    const secret = setupRes.body.secret;
+    const { secret, setupToken } = setupRes.body;
     // Enable OTP with a valid code
     const speakeasy = require('speakeasy');
     const validCode = speakeasy.totp({ secret, encoding: 'base32' });
     await request(app)
       .post('/api/auth/otp/enable')
       .set('Authorization', `Bearer ${token}`)
-      .send({ otp_code: validCode });
+      .send({ otp_code: validCode, setupToken });
     // Disable with correct code
     const disableRes = await request(app)
       .post('/api/auth/otp/disable')

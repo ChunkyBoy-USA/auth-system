@@ -4,7 +4,7 @@ A modern, multi-factor authentication system demonstrating secure user authentic
 
 ## 🚀 Live Demo
 
-**[Try the live demo here](https://auth-system.onrender.com)** *(Deployment in progress)*
+**[Try the live demo here](https://auth-system-jr80.onrender.com)** 
 
 > **Note**: The demo is hosted on Render.com's free tier and may take 30-60 seconds to wake up on first access after inactivity.
 

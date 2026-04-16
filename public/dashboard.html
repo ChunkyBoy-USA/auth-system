@@ -115,9 +115,9 @@
         document.getElementById('otpStatus').style.display = 'none';
         document.getElementById('otpEnabled').style.display = 'block';
       } else {
-        document.getElementById('otpStatus').style.display = 'none';
-        document.getElementById('otpSetup').style.display = 'block';
-        setupOtp();
+        document.getElementById('otpStatus').style.display = 'block';
+        document.getElementById('otpStatus').innerHTML = '<button class="btn primary" onclick="setupOtp()">Set Up OTP</button>';
+        document.getElementById('otpSetup').style.display = 'none';
       }
 
       // Passkey section
@@ -171,14 +171,20 @@
       loadSessions();
     }
 
-    // OTP setup — only called when OTP is not yet enabled
+    // OTP setup — only called when user clicks the setup button
     async function setupOtp() {
       const res = await api('/api/auth/otp/setup', { method: 'POST' });
-      if (!res.ok) return; // user already has OTP set up
+      if (!res.ok) {
+        showMsg('Failed to generate OTP secret', 'error');
+        return;
+      }
       const data = await res.json();
+      document.getElementById('otpStatus').style.display = 'none';
+      document.getElementById('otpSetup').style.display = 'block';
       const qrImg = document.getElementById('otpQrCode');
       qrImg.src = data.qrCodeDataUrl;
       qrImg.style.display = 'block';
+      window.otpSetupToken = data.setupToken;
     }
 
     async function enableOtp() {
@@ -186,7 +192,7 @@
       if (!code) { showMsg('Enter the 6-digit code from your authenticator', 'error'); return; }
       const res = await api('/api/auth/otp/enable', {
         method: 'POST',
-        body: JSON.stringify({ otp_code: code }),
+        body: JSON.stringify({ otp_code: code, setupToken: window.otpSetupToken }),
       });
       const data = await res.json();
       if (data.success) { showMsg('OTP enabled!', 'success'); loadMe(); }

@@ -65,10 +65,10 @@ function deleteAllSessionsForUser(userId) {
 }
 
 // ─── Temp token helpers ─────────────────────────────────────────
-function createTempToken({ token, userId, type, expiresAt }) {
+function createTempToken({ token, userId, type, expiresAt, data }) {
   prepare(
-    'INSERT INTO temp_tokens (token, user_id, type, expires_at) VALUES (?, ?, ?, ?)'
-  ).run(token, userId, type, expiresAt);
+    'INSERT INTO temp_tokens (token, user_id, type, expires_at, data) VALUES (?, ?, ?, ?, ?)'
+  ).run(token, userId, type, expiresAt, data || null);
   return findTempToken(token);
 }
 

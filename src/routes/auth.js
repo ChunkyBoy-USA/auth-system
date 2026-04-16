@@ -291,7 +291,17 @@ router.post('/otp/setup', authMiddleware, async (req, res) => {
   }
 
   const secret = speakeasy.generateSecret({ name: req.user.username, issuer: 'AuthSystem', length: 20 });
-  updateUserOtp(req.user.id, secret.base32);
+
+  // Store the pending secret in temp_tokens instead of immediately saving to user record
+  const now = Math.floor(Date.now() / 1000);
+  const setupToken = uuidv4();
+  createTempToken({
+    token: setupToken,
+    userId: req.user.id,
+    type: 'otp_setup_pending',
+    expiresAt: now + 10 * 60, // 10 min TTL for setup
+    data: secret.base32, // Store the secret here temporarily
+  });
 
   const qrCodeDataUrl = await QRCode.toDataURL(secret.otpauth_url);
 
@@ -299,26 +309,45 @@ router.post('/otp/setup', authMiddleware, async (req, res) => {
     secret: secret.base32,
     otpauthUri: secret.otpauth_url,
     qrCodeDataUrl,
+    setupToken,
     message: 'Scan this secret in your authenticator app. Then enable with /api/auth/otp/enable',
   });
 });
 
 // ─── POST /api/auth/otp/enable ───────────────────────────────────
 router.post('/otp/enable', authMiddleware, (req, res) => {
-  const { otp_code } = req.body;
+  const { otp_code, setupToken } = req.body;
 
-  if (!otp_code) {
-    return res.status(400).json({ error: 'otp_code is required' });
+  if (!otp_code || !setupToken) {
+    return res.status(400).json({ error: 'otp_code and setupToken are required' });
   }
 
-  if (!req.user.otp_secret) {
-    return res.status(400).json({ error: 'OTP not set up. Call /otp/setup first.' });
+  if (req.user.otp_secret) {
+    return res.status(400).json({ error: 'OTP already enabled' });
   }
 
-  const verified = speakeasy.totp.verify({ secret: req.user.otp_secret, encoding: 'base32', token: otp_code });
+  // Retrieve the pending secret from temp_tokens
+  const now = Math.floor(Date.now() / 1000);
+  const temp = findTempToken(setupToken);
+
+  if (!temp || temp.expires_at < now || temp.type !== 'otp_setup_pending' || temp.user_id !== req.user.id) {
+    return res.status(401).json({ error: 'Setup token expired or invalid. Call /otp/setup again.' });
+  }
+
+  const pendingSecret = temp.data;
+  if (!pendingSecret) {
+    return res.status(500).json({ error: 'Setup token missing secret data' });
+  }
+
+  // Verify the OTP code against the pending secret
+  const verified = speakeasy.totp.verify({ secret: pendingSecret, encoding: 'base32', token: otp_code });
   if (!verified) {
     return res.status(401).json({ error: 'Invalid OTP code — setup not confirmed' });
   }
+
+  // Verification successful — save the secret to the user record
+  updateUserOtp(req.user.id, pendingSecret);
+  deleteTempToken(setupToken);
 
   res.json({ success: true, message: 'OTP is now enabled' });
 });

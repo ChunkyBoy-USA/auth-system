@@ -28,12 +28,6 @@ AuthSystem is a full-stack authentication demo that showcases multiple authentic
 
 This project serves as both a learning resource and a foundation for building secure authentication systems in Node.js applications.
 
-## 🎬 Demo Animation
-
-![AuthSystem Demo](docs/demo.gif)
-
-*Demonstration of registration, login, OTP setup, and session management flows*
-
 ## Features
 
 ### Authentication Methods

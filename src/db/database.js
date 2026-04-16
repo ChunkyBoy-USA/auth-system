@@ -70,10 +70,23 @@ async function initDb() {
       token TEXT PRIMARY KEY,
       user_id INTEGER NOT NULL REFERENCES users(id),
       type TEXT NOT NULL,
+      data TEXT,
       created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
       expires_at INTEGER NOT NULL
     );
   `);
+
+  // Migration: Add data column to temp_tokens if it doesn't exist
+  try {
+    const tableInfo = db.exec("PRAGMA table_info(temp_tokens)");
+    const hasDataColumn = tableInfo[0]?.values.some(row => row[1] === 'data');
+    if (!hasDataColumn) {
+      db.run('ALTER TABLE temp_tokens ADD COLUMN data TEXT');
+      persist();
+    }
+  } catch (err) {
+    // Table might not exist yet, which is fine
+  }
 
   const subjectTypes = [
     [1, 'member', 'Member'],

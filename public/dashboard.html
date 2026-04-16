@@ -136,6 +136,7 @@
 
     async function loadSessions() {
       const res = await api('/api/auth/sessions');
+      if (res.status === 401) { logout(); return; }
       const sessions = await res.json();
       const list = document.getElementById('sessionsList');
       if (!sessions.length) {
@@ -158,6 +159,7 @@
 
     async function revokeSession(sessionId) {
       const res = await api(`/api/auth/sessions/${sessionId}`, { method: 'DELETE' });
+      if (res.status === 401) { logout(); return; }
       if (res.ok) loadSessions();
       else showMsg('Failed to revoke session', 'error');
     }
@@ -180,6 +182,7 @@
     // OTP setup — only called when user clicks the setup button
     async function setupOtp() {
       const res = await api('/api/auth/otp/setup', { method: 'POST' });
+      if (res.status === 401) { logout(); return; }
       if (!res.ok) {
         showMsg('Failed to generate OTP secret', 'error');
         return;
@@ -200,6 +203,7 @@
         method: 'POST',
         body: JSON.stringify({ otp_code: code, setupToken: window.otpSetupToken }),
       });
+      if (res.status === 401) { logout(); return; }
       const data = await res.json();
       if (data.success) { showMsg('OTP enabled!', 'success'); loadMe(); }
       else showMsg(data.error, 'error');
@@ -221,6 +225,7 @@
         method: 'POST',
         body: JSON.stringify({ otp_code: code }),
       });
+      if (res.status === 401) { logout(); return; }
       const data = await res.json();
       if (data.success) { showMsg('OTP disabled', 'success'); loadMe(); }
       else showMsg(data.error, 'error');
@@ -230,6 +235,7 @@
     async function registerPasskey() {
       try {
         const optsRes = await api('/api/auth/passkey/register-options', { method: 'POST' });
+        if (optsRes.status === 401) { logout(); return; }
         if (!optsRes.ok) {
           showMsg('Server error ' + optsRes.status, 'error');
           return;
@@ -244,6 +250,7 @@
           method: 'POST',
           body: JSON.stringify(credential),
         });
+        if (verifyRes.status === 401) { logout(); return; }
         const data = await verifyRes.json();
         if (data.success) { showMsg('Passkey registered!', 'success'); loadMe(); }
         else showMsg(data.error, 'error');

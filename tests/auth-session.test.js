@@ -271,6 +271,63 @@ describe('DELETE /api/auth/sessions/:id', () => {
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/current session/i);
   });
+
+  it('allows user to revoke their other (non-current) sessions', async () => {
+    const name = uid('revokeother');
+    await register(name);
+    // Create first session (login)
+    const token1 = await getToken(name);
+    // Create second session by logging in again
+    const token2 = await request(app)
+      .post('/api/auth/login/password')
+      .send({ username: name, password: 'pass123' })
+      .then((r) => r.body.token);
+    // Get list of sessions — queried with token1, so S1 is current, S2 is not
+    const sessRes = await request(app)
+      .get('/api/auth/sessions')
+      .set('Authorization', `Bearer ${token1}`);
+    const otherSession = sessRes.body.find((s) => !s.isCurrent);
+    // Revoke the other session (S2) using token1 — token2 stays as current session
+    const revokeRes = await request(app)
+      .delete(`/api/auth/sessions/${otherSession.id}`)
+      .set('Authorization', `Bearer ${token1}`);
+    expect(revokeRes.status).toBe(200);
+    expect(revokeRes.body.success).toBe(true);
+  });
+
+  it('returns 401 when using a revoked session', async () => {
+    const name = uid('revoked');
+    await register(name);
+    // Create two sessions
+    const token1 = await getToken(name);
+    const token2 = await request(app)
+      .post('/api/auth/login/password')
+      .send({ username: name, password: 'pass123' })
+      .then((r) => r.body.token);
+    // Verify both tokens are valid before revoking
+    expect((await request(app).get('/api/auth/me').set('Authorization', `Bearer ${token1}`)).status).toBe(200);
+    expect((await request(app).get('/api/auth/me').set('Authorization', `Bearer ${token2}`)).status).toBe(200);
+    // Get sessions with token1 so S1 is current, S2 is non-current
+    const sessRes = await request(app)
+      .get('/api/auth/sessions')
+      .set('Authorization', `Bearer ${token1}`);
+    const otherSession = sessRes.body.find((s) => !s.isCurrent);
+    // Revoke S2 (the non-current session) using token1
+    const revokeRes = await request(app)
+      .delete(`/api/auth/sessions/${otherSession.id}`)
+      .set('Authorization', `Bearer ${token1}`);
+    expect(revokeRes.status).toBe(200);
+    // Token1 is still valid (its own session S1 is still active)
+    const meRes = await request(app)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${token1}`);
+    expect(meRes.status).toBe(200);
+    // Token2 is now invalid because its session S2 was revoked
+    const meRes2 = await request(app)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${token2}`);
+    expect(meRes2.status).toBe(401);
+  });
 });
 
 // ─── POST /api/auth/otp/setup ─────────────────────────────────

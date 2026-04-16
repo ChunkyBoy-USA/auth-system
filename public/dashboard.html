@@ -136,6 +136,7 @@
 
     async function loadSessions() {
       const res = await api('/api/auth/sessions');
+      if (res.status === 401) { logout(); return; }
       const sessions = await res.json();
       const list = document.getElementById('sessionsList');
       if (!sessions.length) {
@@ -158,6 +159,7 @@
 
     async function revokeSession(sessionId) {
       const res = await api(`/api/auth/sessions/${sessionId}`, { method: 'DELETE' });
+      if (res.status === 401) { logout(); return; }
       if (res.ok) loadSessions();
       else showMsg('Failed to revoke session', 'error');
     }

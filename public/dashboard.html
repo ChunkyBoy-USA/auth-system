@@ -153,7 +153,7 @@
     }
 
     async function revokeSession(sessionId) {
-      const res = await api(`/api/auth/session/${sessionId}`, { method: 'DELETE' });
+      const res = await api(`/api/auth/sessions/${sessionId}`, { method: 'DELETE' });
       if (res.ok) loadSessions();
       else showMsg('Failed to revoke session', 'error');
     }
@@ -168,7 +168,9 @@
     async function logoutAll() {
       if (!confirm('Logout all devices?')) return;
       await api('/api/auth/logout-all', { method: 'POST' });
-      loadSessions();
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('auth_user');
+      window.location.href = '/';
     }
 
     // OTP setup — only called when user clicks the setup button

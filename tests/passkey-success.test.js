@@ -113,16 +113,17 @@ describe('POST /api/auth/passkey/register-verify (success)', () => {
     const mockCredId = Buffer.from('mock-cred-id').toString('base64url');
     const mockPubKey = Buffer.from('mock-pub-key').toString('base64url');
 
-    // Override the mock to return the right credential ID
+    // Override the mock to return the right credential structure (v9+ format)
     const { verifyRegistrationResponse } = require('@simplewebauthn/server');
     verifyRegistrationResponse.mockResolvedValueOnce({
       registrationInfo: {
-        credentialID: Buffer.from(mockCredId),
-        credentialPublicKey: Buffer.from(mockPubKey),
-        counter: 0,
+        credential: {
+          id: mockCredId,
+          publicKey: Buffer.from(mockPubKey, 'base64url'),
+          counter: 0,
+        },
         credentialDeviceType: 'singleDevice',
         credentialBackedUp: false,
-        credentialExcludedDevices: [],
       },
     });
 
@@ -181,12 +182,13 @@ describe('POST /api/auth/passkey/login-options (success)', () => {
     const { verifyRegistrationResponse } = require('@simplewebauthn/server');
     verifyRegistrationResponse.mockResolvedValueOnce({
       registrationInfo: {
-        credentialID: Buffer.from(mockCredId),
-        credentialPublicKey: Buffer.from(mockPubKey),
-        counter: 0,
+        credential: {
+          id: mockCredId,
+          publicKey: Buffer.from(mockPubKey, 'base64url'),
+          counter: 0,
+        },
         credentialDeviceType: 'singleDevice',
         credentialBackedUp: false,
-        credentialExcludedDevices: [],
       },
     });
 
@@ -223,12 +225,13 @@ describe('POST /api/auth/passkey/login-verify (success)', () => {
     const { verifyRegistrationResponse } = require('@simplewebauthn/server');
     verifyRegistrationResponse.mockResolvedValueOnce({
       registrationInfo: {
-        credentialID: Buffer.from(mockCredId),
-        credentialPublicKey: Buffer.from(mockPubKey),
-        counter: 0,
+        credential: {
+          id: mockCredId,
+          publicKey: Buffer.from(mockPubKey, 'base64url'),
+          counter: 0,
+        },
         credentialDeviceType: 'singleDevice',
         credentialBackedUp: false,
-        credentialExcludedDevices: [],
       },
     });
 
@@ -278,12 +281,13 @@ describe('POST /api/auth/passkey/login-verify (success)', () => {
     const { verifyRegistrationResponse } = require('@simplewebauthn/server');
     verifyRegistrationResponse.mockResolvedValueOnce({
       registrationInfo: {
-        credentialID: Buffer.from(mockCredId),
-        credentialPublicKey: Buffer.from(mockPubKey),
-        counter: 0,
+        credential: {
+          id: mockCredId,
+          publicKey: Buffer.from(mockPubKey, 'base64url'),
+          counter: 0,
+        },
         credentialDeviceType: 'singleDevice',
         credentialBackedUp: false,
-        credentialExcludedDevices: [],
       },
     });
 

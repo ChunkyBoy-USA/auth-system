@@ -1,0 +1,23 @@
+{
+  "services": [
+    {
+      "type": "web",
+      "name": "auth-system",
+      "env": "node",
+      "buildCommand": "npm install",
+      "startCommand": "npm start",
+      "envVars": [
+        {
+          "key": "NODE_ENV",
+          "value": "production"
+        },
+        {
+          "key": "PORT",
+          "generateValue": true
+        }
+      ],
+      "healthCheckPath": "/",
+      "autoDeploy": true
+    }
+  ]
+}

@@ -1,0 +1,246 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #f0f2f5;
+  color: #333;
+  min-height: 100vh;
+}
+
+/* ── Layout ──────────────────────────────────────────────────── */
+.container {
+  max-width: 600px;
+  margin: 40px auto;
+  padding: 0 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* ── Card ───────────────────────────────────────────────────── */
+.card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.08);
+}
+
+.card h1, .card h2 { margin-bottom: 16px; font-size: 1.3rem; }
+.card h3 { margin-bottom: 8px; font-size: 1rem; color: #555; }
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+/* ── Logo ───────────────────────────────────────────────────── */
+.logo {
+  font-size: 1.5rem;
+  font-weight: 700;
+  text-align: center;
+  margin-bottom: 8px;
+}
+
+/* ── Tabs ───────────────────────────────────────────────────── */
+.tabs {
+  display: flex;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #ddd;
+  margin-bottom: 20px;
+}
+
+.tab {
+  flex: 1;
+  padding: 10px 8px;
+  border: none;
+  background: #fafafa;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background 0.2s;
+}
+
+.tab.active { background: #4f46e5; color: #fff; }
+.tab:hover:not(.active) { background: #eee; }
+
+/* ── Form ───────────────────────────────────────────────────── */
+.form-group {
+  margin-bottom: 14px;
+}
+
+.form-group label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: #444;
+}
+
+input[type="text"],
+input[type="password"] {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  font-size: 1rem;
+  transition: border-color 0.2s;
+}
+
+input:focus { outline: none; border-color: #4f46e5; }
+
+code {
+  background: #f0f0f0;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  word-break: break-all;
+}
+
+/* ── Credential selector ────────────────────────────────────── */
+.cred-selector {
+  margin-bottom: 16px;
+}
+
+.cred-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  display: block;
+  margin-bottom: 8px;
+  color: #555;
+}
+
+.cred-options {
+  display: flex;
+  gap: 12px;
+}
+
+.cred-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+/* ── Buttons ─────────────────────────────────────────────────── */
+.btn {
+  padding: 10px 20px;
+  border-radius: 8px;
+  border: none;
+  font-size: 1rem;
+  cursor: pointer;
+  font-weight: 600;
+  transition: opacity 0.2s, background 0.2s;
+}
+
+.btn:hover { opacity: 0.85; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btn.primary { background: #4f46e5; color: #fff; width: 100%; }
+.btn.outline { background: transparent; border: 1px solid #4f46e5; color: #4f46e5; }
+.btn.danger { background: #dc2626; color: #fff; }
+.btn.small { padding: 6px 12px; font-size: 0.85rem; }
+
+/* ── Hint / Messages ────────────────────────────────────────── */
+.hint {
+  font-size: 0.85rem;
+  color: #777;
+  margin-top: 6px;
+}
+
+#message {
+  text-align: center;
+  margin-top: 10px;
+  font-weight: 600;
+}
+
+#message.error { color: #dc2626; }
+#message.success, #message.info { color: #16a34a; }
+
+/* ── Footer links ───────────────────────────────────────────── */
+.footer-links {
+  text-align: center;
+  margin-top: 16px;
+  font-size: 0.9rem;
+  color: #666;
+}
+
+.footer-links a { color: #4f46e5; text-decoration: none; }
+.footer-links a:hover { text-decoration: underline; }
+
+/* ── Navbar ─────────────────────────────────────────────────── */
+.navbar {
+  background: #fff;
+  padding: 12px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 1px 4px rgba(0,0,0,.08);
+}
+
+.nav-brand { font-weight: 700; font-size: 1.1rem; }
+.nav-right { display: flex; align-items: center; gap: 12px; }
+.nav-user { font-weight: 600; color: #4f46e5; }
+
+/* ── Info grid ──────────────────────────────────────────────── */
+.info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.info-item {
+  background: #f9f9f9;
+  padding: 10px 12px;
+  border-radius: 8px;
+}
+
+.info-item .label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 2px;
+}
+
+/* ── Sessions ───────────────────────────────────────────────── */
+.session-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  background: #f9f9f9;
+}
+
+.session-item.current { border: 2px solid #4f46e5; background: #f0f0ff; }
+.session-item.expired { opacity: 0.5; }
+
+.session-info small { color: #888; font-size: 0.8rem; }
+
+/* ── Badges ─────────────────────────────────────────────────── */
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: #e0e0ff;
+  color: #4f46e5;
+}
+
+.badge.success { background: #dcfce7; color: #16a34a; }
+.badge.danger { background: #fee2e2; color: #dc2626; }
+
+/* ── Security section ───────────────────────────────────────── */
+.security-section {
+  padding: 16px 0;
+  border-top: 1px solid #eee;
+}
+
+.security-section:first-child { border-top: none; padding-top: 0; }

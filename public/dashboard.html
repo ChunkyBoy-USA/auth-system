@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AuthSystem — Dashboard</title>
+  <link rel="stylesheet" href="/style.css" />
+  <script src="/lib/simplewebauthn-browser.umd.min.js"></script>
+</head>
+<body>
+  <nav class="navbar">
+    <div class="nav-brand">🔐 AuthSystem</div>
+    <div class="nav-right">
+      <span id="navUsername" class="nav-user"></span>
+      <button class="btn outline" onclick="logout()">Logout</button>
+    </div>
+  </nav>
+
+  <div class="container">
+    <!-- User info card -->
+    <div class="card">
+      <h2>👤 Profile</h2>
+      <div class="info-grid">
+        <div class="info-item"><span class="label">ID</span><span id="userId"></span></div>
+        <div class="info-item"><span class="label">Username</span><span id="userUsername"></span></div>
+        <div class="info-item"><span class="label">Subject Type</span><span id="userSubjectType"></span></div>
+        <div class="info-item"><span class="label">OTP Enabled</span><span id="userHasOtp"></span></div>
+        <div class="info-item"><span class="label">Passkey Enabled</span><span id="userHasPasskey"></span></div>
+      </div>
+    </div>
+
+    <!-- Active sessions card -->
+    <div class="card">
+      <div class="card-header">
+        <h2>📱 Active Sessions</h2>
+        <button class="btn danger" onclick="logoutAll()">Logout All Devices</button>
+      </div>
+      <div id="sessionsList"></div>
+    </div>
+
+    <!-- Security card -->
+    <div class="card">
+      <h2>🔒 Security Settings</h2>
+
+      <!-- OTP section -->
+      <div class="security-section">
+        <h3>OTP / Authenticator App</h3>
+        <div id="otpStatus">Loading...</div>
+        <div id="otpSetup" style="display:none">
+          <p class="hint">Scan the QR code below with Google Authenticator (or any TOTP app), then enter the code to enable.</p>
+          <img id="otpQrCode" src="" alt="OTP QR Code" style="display:block;margin:12px auto;max-width:200px;border-radius:8px;" />
+          <div class="form-group">
+            <label for="otpEnableCode">Enter code from app:</label>
+            <input type="text" id="otpEnableCode" placeholder="6-digit code" maxlength="6" />
+          </div>
+          <button class="btn primary" onclick="enableOtp()">Enable OTP</button>
+        </div>
+        <div id="otpEnabled" style="display:none">
+          <span class="badge success">✅ OTP is enabled</span>
+          <br /><br />
+          <button class="btn outline" onclick="showDisableOtp()">Disable OTP</button>
+        </div>
+        <div id="otpDisableSection" style="display:none">
+          <p class="hint">Enter a code to confirm disabling OTP:</p>
+          <input type="text" id="otpDisableCode" placeholder="6-digit code" maxlength="6" />
+          <button class="btn danger" onclick="disableOtp()">Confirm Disable</button>
+          <button class="btn outline" onclick="cancelDisableOtp()">Cancel</button>
+        </div>
+      </div>
+
+      <!-- Passkey section -->
+      <div class="security-section">
+        <h3>Passkey / WebAuthn</h3>
+        <div id="passkeyStatus">Loading...</div>
+        <div id="passkeySetup" style="display:none">
+          <button class="btn primary" onclick="registerPasskey()">Register Passkey</button>
+        </div>
+        <div id="passkeyEnabled" style="display:none">
+          <span class="badge success">✅ Passkey is registered</span>
+        </div>
+      </div>
+    </div>
+
+    <p class="hint" id="message"></p>
+  </div>
+
+  <script>
+    const TOKEN = localStorage.getItem('auth_token');
+    if (!TOKEN) { window.location.href = '/'; }
+
+    function api(path, options = {}) {
+      return fetch(path, {
+        ...options,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${TOKEN}`,
+          ...(options.headers || {}),
+        },
+      });
+    }
+
+    async function loadMe() {
+      const res = await api('/api/auth/me');
+      if (!res.ok) { logout(); return; }
+      const user = await res.json();
+      document.getElementById('navUsername').textContent = user.username;
+      document.getElementById('userId').textContent = user.id;
+      document.getElementById('userUsername').textContent = user.username;
+      document.getElementById('userSubjectType').textContent = user.subjectType;
+      document.getElementById('userHasOtp').textContent = user.hasOtp ? 'Yes' : 'No';
+      document.getElementById('userHasPasskey').textContent = user.hasPasskey ? 'Yes' : 'No';
+
+      // OTP section
+      if (user.hasOtp) {
+        document.getElementById('otpStatus').style.display = 'none';
+        document.getElementById('otpSetup').style.display = 'none';
+        document.getElementById('otpDisableSection').style.display = 'none';
+        document.getElementById('otpEnabled').style.display = 'block';
+      } else {
+        document.getElementById('otpStatus').style.display = 'block';
+        document.getElementById('otpStatus').innerHTML = '<button class="btn primary" onclick="setupOtp()">Set Up OTP</button>';
+        document.getElementById('otpSetup').style.display = 'none';
+        document.getElementById('otpEnabled').style.display = 'none';
+        document.getElementById('otpDisableSection').style.display = 'none';
+      }
+
+      // Passkey section
+      if (user.hasPasskey) {
+        document.getElementById('passkeyStatus').style.display = 'none';
+        document.getElementById('passkeyEnabled').style.display = 'block';
+      } else {
+        document.getElementById('passkeyStatus').style.display = 'none';
+        document.getElementById('passkeySetup').style.display = 'block';
+      }
+    }
+
+    async function loadSessions() {
+      const res = await api('/api/auth/sessions');
+      const sessions = await res.json();
+      const list = document.getElementById('sessionsList');
+      if (!sessions.length) {
+        list.innerHTML = '<p class="hint">No active sessions.</p>';
+        return;
+      }
+      list.innerHTML = sessions.map(s => `
+        <div class="session-item ${s.isCurrent ? 'current' : ''} ${s.isExpired ? 'expired' : ''}">
+          <div class="session-info">
+            <strong>${s.deviceName}</strong>
+            ${s.isCurrent ? '<span class="badge">Current</span>' : ''}
+            ${s.isExpired ? '<span class="badge danger">Expired</span>' : ''}
+            <br /><small>IP: ${s.ipAddress}</small>
+            <br /><small>Last active: ${new Date(s.lastActiveAt * 1000).toLocaleString()}</small>
+          </div>
+          ${!s.isCurrent && !s.isExpired ? `<button class="btn danger small" onclick="revokeSession('${s.id}')">Revoke</button>` : ''}
+        </div>
+      `).join('');
+    }
+
+    async function revokeSession(sessionId) {
+      const res = await api(`/api/auth/sessions/${sessionId}`, { method: 'DELETE' });
+      if (res.ok) loadSessions();
+      else showMsg('Failed to revoke session', 'error');
+    }
+
+    async function logout() {
+      await api('/api/auth/logout', { method: 'POST' });
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('auth_user');
+      window.location.href = '/';
+    }
+
+    async function logoutAll() {
+      if (!confirm('Logout all devices?')) return;
+      await api('/api/auth/logout-all', { method: 'POST' });
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('auth_user');
+      window.location.href = '/';
+    }
+
+    // OTP setup — only called when user clicks the setup button
+    async function setupOtp() {
+      const res = await api('/api/auth/otp/setup', { method: 'POST' });
+      if (!res.ok) {
+        showMsg('Failed to generate OTP secret', 'error');
+        return;
+      }
+      const data = await res.json();
+      document.getElementById('otpStatus').style.display = 'none';
+      document.getElementById('otpSetup').style.display = 'block';
+      const qrImg = document.getElementById('otpQrCode');
+      qrImg.src = data.qrCodeDataUrl;
+      qrImg.style.display = 'block';
+      window.otpSetupToken = data.setupToken;
+    }
+
+    async function enableOtp() {
+      const code = document.getElementById('otpEnableCode').value.trim();
+      if (!code) { showMsg('Enter the 6-digit code from your authenticator', 'error'); return; }
+      const res = await api('/api/auth/otp/enable', {
+        method: 'POST',
+        body: JSON.stringify({ otp_code: code, setupToken: window.otpSetupToken }),
+      });
+      const data = await res.json();
+      if (data.success) { showMsg('OTP enabled!', 'success'); loadMe(); }
+      else showMsg(data.error, 'error');
+    }
+
+    function showDisableOtp() {
+      document.getElementById('otpEnabled').style.display = 'none';
+      document.getElementById('otpDisableSection').style.display = 'block';
+    }
+
+    function cancelDisableOtp() {
+      document.getElementById('otpDisableSection').style.display = 'none';
+      document.getElementById('otpEnabled').style.display = 'block';
+    }
+
+    async function disableOtp() {
+      const code = document.getElementById('otpDisableCode').value.trim();
+      const res = await api('/api/auth/otp/disable', {
+        method: 'POST',
+        body: JSON.stringify({ otp_code: code }),
+      });
+      const data = await res.json();
+      if (data.success) { showMsg('OTP disabled', 'success'); loadMe(); }
+      else showMsg(data.error, 'error');
+    }
+
+    // Passkey registration
+    async function registerPasskey() {
+      try {
+        const optsRes = await api('/api/auth/passkey/register-options', { method: 'POST' });
+        if (!optsRes.ok) {
+          showMsg('Server error ' + optsRes.status, 'error');
+          return;
+        }
+        const opts = await optsRes.json();
+        if (!opts.challenge || !opts.user || !opts.user.id) {
+          showMsg('Invalid options from server', 'error');
+          return;
+        }
+        const credential = await SimpleWebAuthnBrowser.startRegistration(opts);
+        const verifyRes = await api('/api/auth/passkey/register-verify', {
+          method: 'POST',
+          body: JSON.stringify(credential),
+        });
+        const data = await verifyRes.json();
+        if (data.success) { showMsg('Passkey registered!', 'success'); loadMe(); }
+        else showMsg(data.error, 'error');
+      } catch (err) {
+        showMsg('Passkey error: ' + err.message, 'error');
+      }
+    }
+
+    function showMsg(msg, type = '') {
+      const el = document.getElementById('message');
+      el.textContent = msg;
+      el.className = type;
+    }
+
+    // Init
+    loadMe();
+    loadSessions();
+  </script>
+</body>
+</html>

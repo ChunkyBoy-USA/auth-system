@@ -3,12 +3,18 @@ const express = require('express');
 const speakeasy = require('speakeasy');
 const authRouter = require('../src/routes/auth');
 const models = require('../src/db/models');
+const { OtpAuthenticator } = require('../src/auth/OtpAuthenticator');
+const { authService } = require('../src/auth/AuthService');
 
 // Mock the database models
 jest.mock('../src/db/models');
 
 // Mock speakeasy
 jest.mock('speakeasy');
+
+// Ensure OtpAuthenticator is registered on the authService singleton.
+// server.js is not loaded in this test file, so we register it here.
+authService.register(new OtpAuthenticator());
 
 describe('OTP Authentication Endpoints', () => {
   let app;
@@ -270,6 +276,7 @@ describe('OTP Authentication Endpoints', () => {
     beforeEach(() => {
       mockUser.otp_secret = 'JBSWY3DPEHPK3PXP';
       models.findUserById.mockReturnValue(mockUser);
+      models.findUserByUsername.mockReturnValue(mockUser);
 
       mockTempToken = {
         token: 'temp-token-123',

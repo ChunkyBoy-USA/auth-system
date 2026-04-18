@@ -1,17 +1,9 @@
-// Shared device parsing for passkey routes
-function parseDevice(req) {
-  const ua = req.headers['user-agent'] || 'Unknown Device';
-  let deviceName = 'Unknown Device';
-  if (ua.includes('Edg/')) deviceName = 'Edge';
-  else if (ua.includes('Chrome')) deviceName = 'Chrome';
-  else if (ua.includes('Firefox')) deviceName = 'Firefox';
-  else if (ua.includes('Safari') && !ua.includes('Chrome')) deviceName = 'Safari';
-  else if (ua.includes('Postman')) deviceName = 'Postman';
-  else deviceName = ua.slice(0, 40);
-  return {
-    deviceName,
-    ipAddress: req.ip || req.connection.remoteAddress || '0.0.0.0',
-  };
-}
-
+/**
+ * passkey-helpers — Re-exports parseDevice for backward compatibility.
+ *
+ * The parseDevice logic has been moved to SessionManager to avoid duplication.
+ * This module re-exports it so existing consumers (tests) don't need changes.
+ * New code should import directly from SessionManager.
+ */
+const { parseDevice } = require('../auth/SessionManager');
 module.exports = { parseDevice };

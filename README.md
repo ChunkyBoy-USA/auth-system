@@ -65,6 +65,32 @@ This project serves as both a learning resource and a foundation for building se
 
 ## Technical Architecture
 
+### SOLID Principles Implementation
+
+The authentication system follows SOLID design principles for maintainability and extensibility:
+
+#### Single Responsibility Principle
+- **AuthService**: Orchestrates authentication flows and manages authenticators
+- **SessionManager**: Handles all session lifecycle operations
+- **Authenticator classes**: Each authentication method (Password, OTP) is isolated
+- **SubjectPolicy**: Manages role-based permissions separately
+
+#### Open/Closed Principle
+- New authentication methods can be added by creating new `Authenticator` implementations
+- No changes needed to routes or `AuthService` when adding new login methods
+- Example: Adding OAuth would only require creating `OAuthAuthenticator.js` and registering it
+
+#### Dependency Inversion Principle
+- Routes depend on `AuthService` abstraction, not concrete implementations
+- Authenticators implement a common interface defined in `Authenticator.js`
+- Easy to swap storage backends (e.g., Redis) by changing only `SessionManager`
+
+### Architecture Benefits
+- **Extensible**: Add new authentication methods without modifying existing code
+- **Testable**: Each component can be tested in isolation with mocks
+- **Maintainable**: Clear separation of concerns makes debugging easier
+- **Type-safe**: Typed error classes (`AuthError`, `TokenError`) for precise error handling
+
 ### Backend Stack
 - **Runtime**: Node.js
 - **Framework**: Express.js
@@ -123,14 +149,21 @@ auth-system/
 ├── server.js                 # Express app setup and entry point
 ├── package.json              # Dependencies and scripts
 ├── src/
+│   ├── auth/                 # Authentication core (SOLID architecture)
+│   │   ├── AuthService.js    # Central authentication orchestrator
+│   │   ├── Authenticator.js  # Base authenticator interface
+│   │   ├── PasswordAuthenticator.js # Password authentication strategy
+│   │   ├── OtpAuthenticator.js      # TOTP authentication strategy
+│   │   ├── SessionManager.js        # Session lifecycle management
+│   │   ├── SubjectPolicy.js         # Role-based access control policies
+│   │   └── ChallengeStore.js        # WebAuthn challenge management
 │   ├── db/
 │   │   ├── database.js       # Database initialization and persistence
 │   │   └── models.js         # Data access layer (CRUD operations)
 │   ├── routes/
-│   │   ├── auth.js           # Password and OTP authentication routes
+│   │   ├── auth.js           # Authentication routes (delegates to AuthService)
 │   │   ├── passkey.js        # WebAuthn passkey routes
-│   │   ├── passkey-helpers.js # Device parsing utilities
-│   │   └── otpHelpers.js     # OTP utility functions
+│   │   └── passkey-helpers.js # Device parsing utilities
 │   └── middleware/
 │       └── auth.js           # Session validation middleware
 ├── public/
@@ -231,7 +264,7 @@ The test suite includes:
 - Passkey registration and authentication tests
 - Edge case and error handling tests
 
-**Test Coverage**: 170 tests covering all API endpoints and edge cases
+**Test Coverage**: 172 tests covering all API endpoints and edge cases
 
 #### UI/E2E Tests (Frontend)
 
@@ -267,14 +300,14 @@ This project includes comprehensive testing at multiple levels:
         /\
        /UI\         28 E2E tests (Playwright)
       /----\
-     /Unit  \       170 API tests (Jest + Supertest)
+     /Unit  \       172 API tests (Jest + Supertest)
     /--------\
    /Integration\    Full stack coverage
   /--------------\
 ```
 
 ### Backend Tests (Jest + Supertest)
-- **170 tests** covering all API endpoints
+- **172 tests** covering all API endpoints
 - **91%+ code coverage**
 - Tests run against real SQLite database
 - Isolated test data with unique identifiers

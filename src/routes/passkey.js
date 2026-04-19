@@ -1,3 +1,13 @@
+/**
+ * Passkey routes — Delegated to AuthService and ChallengeStore.
+ *
+ * Previously contained duplicated session creation logic and an unmanaged
+ * in-memory challenge store. Now uses:
+ *   - SessionManager (from AuthService.sessionManager) for session creation
+ *   - ChallengeStore for WebAuthn challenge lifecycle + background cleanup
+ *   - AuthService.buildLoginResponse() for consistent response formatting
+ */
+
 const express = require('express');
 const {
   generateAuthenticationOptions,
@@ -6,54 +16,41 @@ const {
   verifyRegistrationResponse,
 } = require('@simplewebauthn/server');
 const { isoBase64URL, isoUint8Array } = require('@simplewebauthn/server/helpers');
-const { findUserByUsername, findUserById, updateUserPasskey, createSession, getSubjectById } = require('../db/models');
+const { findUserByUsername, findUserById, updateUserPasskey, getSubjectById } = require('../db/models');
 const { authMiddleware } = require('../middleware/auth');
-const { parseDevice } = require('./passkey-helpers');
+const { authService } = require('../auth/AuthService');
+const { challengeStore } = require('../auth/ChallengeStore');
+const { parseDevice } = require('../auth/SessionManager');
 
 const router = express.Router();
 
-// RP ID for WebAuthn — must match the origin the browser uses.
-// Set HOST environment variable to your machine's local IP when testing
-// cross-device (e.g. http://192.168.x.x:3000 on your phone).
-// Default: localhost (only works on the same device).
+// ─── RP configuration helpers ──────────────────────────────────────────────
+
 function getRpId(req) {
   const rpId = process.env.WEBAUTHN_RP_ID;
   if (rpId) return rpId;
-
   const origin = req.get('origin') || req.headers.origin;
   if (origin) {
-    try {
-      return new URL(origin).hostname;
-    } catch {}
+    try { return new URL(origin).hostname; } catch {}
   }
   return 'localhost';
 }
 
 function getRpOrigin(req) {
-  // Use the origin the browser actually sent (from the Host/Forwarded headers
-  // ngrok sets), so it matches what @simplewebauthn/server validates against.
   const origin = req.get('origin') || req.headers.origin;
   if (origin) {
-    try {
-      const url = new URL(origin);
-      return `${url.protocol}//${url.host}`;
-    } catch {}
+    try { const url = new URL(origin); return `${url.protocol}//${url.host}`; } catch {}
   }
-  // Fallback for local dev: respect WEBAUTHN_ORIGIN env var if set, else localhost
   const port = process.env.PORT || 3000;
   return `http://localhost:${port}`;
 }
 
-// In-memory store for WebAuthn challenges (cleared on use/expiry)
-const challengeStore = new Map();
-
-// ─── POST /api/auth/passkey/register-options ───────────────────
+// ─── POST /api/auth/passkey/register-options ─────────────────────────────
 router.post('/register-options', authMiddleware, async (req, res) => {
   const user = req.user;
   const rpId = getRpId(req);
   const rpOrigin = getRpOrigin(req);
 
-  // Promise.resolve() forces the thenable (v9.0.3) into a real Promise
   const options = await Promise.resolve(generateRegistrationOptions({
     rpName: 'AuthSystem',
     rpID: rpId,
@@ -66,41 +63,31 @@ router.post('/register-options', authMiddleware, async (req, res) => {
     },
   }));
 
-  // Convert user.id from Uint8Array to base64url string so it serialises
-  // correctly in JSON (Uint8Array serialises as { "0": 49 } which
-  // startRegistration cannot decode)
-  options.user = {
-    ...options.user,
-    id: isoBase64URL.fromBuffer(options.user.id),
-  };
+  // Serialize user.id as base64url (Uint8Array serialises badly in JSON)
+  options.user = { ...options.user, id: isoBase64URL.fromBuffer(options.user.id) };
 
-  // Store challenge in base64url form for consistent comparison at verify time
-  challengeStore.set(user.id, {
-    challenge: options.challenge,
-    expiresAt: Date.now() + 5 * 60 * 1000,
-  });
+  // Store challenge in the managed ChallengeStore (auto-expires after 5 min)
+  challengeStore.setRegistrationChallenge(user.id, options.challenge);
 
   res.json(options);
 });
 
-// ─── POST /api/auth/passkey/register-verify ─────────────────────
+// ─── POST /api/auth/passkey/register-verify ────────────────────────────────
 router.post('/register-verify', authMiddleware, async (req, res) => {
   const { body } = req;
-  const user = req.user;
-
-  // Guard: require a body with a credential ID to reach the challenge check
   if (!body || !body.id) {
     return res.status(400).json({ error: 'Challenge expired or not found. Please try again.' });
   }
 
-  const stored = challengeStore.get(user.id);
-  if (!stored || stored.expiresAt < Date.now()) {
+  const stored = challengeStore.popRegistrationChallenge(req.user.id);
+  if (!stored) {
     return res.status(400).json({ error: 'Challenge expired or not found. Please try again.' });
   }
 
   try {
     const rpOrigin = getRpOrigin(req);
     const rpId = getRpId(req);
+
     const verification = await verifyRegistrationResponse({
       response: body,
       expectedChallenge: stored.challenge,
@@ -108,16 +95,12 @@ router.post('/register-verify', authMiddleware, async (req, res) => {
       expectedRPID: rpId,
     });
 
-    // In @simplewebauthn/server v9+, the structure can vary
-    // Check both possible locations for credential data
+    // Handle v9/v9+ API shape differences
     let credentialId, credentialPublicKey;
-
-    if (verification.registrationInfo.credential) {
-      // v9.0.3+ format
+    if (verification.registrationInfo?.credential) {
       credentialId = verification.registrationInfo.credential.id;
       credentialPublicKey = verification.registrationInfo.credential.publicKey;
-    } else if (verification.registrationInfo.credentialID) {
-      // Older v9 format
+    } else if (verification.registrationInfo?.credentialID) {
       credentialId = isoBase64URL.fromBuffer(verification.registrationInfo.credentialID);
       credentialPublicKey = verification.registrationInfo.credentialPublicKey;
     } else {
@@ -125,25 +108,21 @@ router.post('/register-verify', authMiddleware, async (req, res) => {
     }
 
     updateUserPasskey(
-      user.id,
+      req.user.id,
       credentialId,
       isoBase64URL.fromBuffer(credentialPublicKey)
     );
 
-    challengeStore.delete(user.id);
     res.json({ success: true, message: 'Passkey registered successfully' });
   } catch (err) {
     res.status(400).json({ error: 'Passkey registration failed: ' + err.message });
   }
 });
 
-// ─── POST /api/auth/passkey/login-options ───────────────────────
+// ─── POST /api/auth/passkey/login-options ────────────────────────────────
 router.post('/login-options', async (req, res) => {
   const { username } = req.body;
-
-  if (!username) {
-    return res.status(400).json({ error: 'username is required' });
-  }
+  if (!username) return res.status(400).json({ error: 'username is required' });
 
   const user = findUserByUsername(username);
   if (!user || !user.passkey_credential_id) {
@@ -152,34 +131,24 @@ router.post('/login-options', async (req, res) => {
 
   const options = await Promise.resolve(generateAuthenticationOptions({
     rpID: getRpId(req),
-    allowCredentials: [
-      {
-        id: isoBase64URL.toBuffer(user.passkey_credential_id),
-        type: 'public-key',
-        transports: ['internal', 'hybrid'],
-      },
-    ],
+    allowCredentials: [{
+      id: isoBase64URL.toBuffer(user.passkey_credential_id),
+      type: 'public-key',
+      transports: ['internal', 'hybrid'],
+    }],
     userVerification: 'preferred',
     timeout: 60000,
   }));
 
-  // Store challenge for verification
-  challengeStore.set(`auth:${user.id}`, {
-    challenge: options.challenge,
-    userId: user.id,
-    expiresAt: Date.now() + 5 * 60 * 1000,
-  });
+  challengeStore.setAuthenticationChallenge(user.id, options.challenge);
 
   res.json(options);
 });
 
-// ─── POST /api/auth/passkey/login-verify ───────────────────────
+// ─── POST /api/auth/passkey/login-verify ─────────────────────────────────
 router.post('/login-verify', async (req, res) => {
   const { username, body } = req.body;
-
-  if (!username) {
-    return res.status(400).json({ error: 'username is required' });
-  }
+  if (!username) return res.status(400).json({ error: 'username is required' });
 
   const user = findUserByUsername(username);
   if (!user || !user.passkey_credential_id) {
@@ -190,14 +159,15 @@ router.post('/login-verify', async (req, res) => {
     return res.status(400).json({ error: 'Missing credential ID' });
   }
 
-  const stored = challengeStore.get(`auth:${user.id}`);
-  if (!stored || stored.expiresAt < Date.now()) {
+  const stored = challengeStore.popAuthenticationChallenge(user.id);
+  if (!stored) {
     return res.status(400).json({ error: 'Challenge expired or not found. Please try again.' });
   }
 
   try {
     const rpOrigin = getRpOrigin(req);
     const rpId = getRpId(req);
+
     const verification = await verifyAuthenticationResponse({
       response: body,
       expectedChallenge: stored.challenge,
@@ -209,22 +179,10 @@ router.post('/login-verify', async (req, res) => {
       },
     });
 
-    challengeStore.delete(`auth:${user.id}`);
-
-    // Create session
-    const session = createSession({
-      id: require('uuid').v4(),
-      userId: user.id,
-      ...parseDevice(req),
-      expiresAt: Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60,
-    });
-
-    const subject = getSubjectById(user.subject_id);
-    res.json({
-      success: true,
-      token: session.id,
-      user: { id: user.id, username: user.username, subjectType: subject.type },
-    });
+    // Session creation now goes through SessionManager (consistent with all other auth methods)
+    const session = authService.sessionManager.createSession(user, req);
+    const loginResponse = authService._buildLoginResponse(user, session);
+    res.json(loginResponse);
   } catch (err) {
     res.status(400).json({ error: 'Passkey verification failed: ' + err.message });
   }

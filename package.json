@@ -1,6 +1,6 @@
 {
   "name": "auth-system",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Multi-Subject Authentication & Session Management Demo",
   "main": "server.js",
   "scripts": {

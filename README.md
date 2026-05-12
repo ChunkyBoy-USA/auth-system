@@ -1,6 +1,8 @@
 # 🔐 AuthSystem
 
 A modern, multi-factor authentication system demonstrating secure user authentication with support for passwords, time-based one-time passwords (TOTP), and passkeys (WebAuthn). Built as a comprehensive reference implementation for authentication best practices.
+<img width="656" height="587" alt="image" src="https://github.com/user-attachments/assets/b2cb5b9b-63bb-49b8-9fae-086d5241dfaf" />
+
 
 ## 🚀 Live Demo
 
